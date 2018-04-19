@@ -3,9 +3,6 @@
  * @export {AccessControl}
  * @version 0.0.1
  */
-
-import { AccessControl } from 'accesscontrol';
-
 const grants = {
 	guest: {
 		"review": {
@@ -14,44 +11,40 @@ const grants = {
 	},
 	regular: {
 		"review": {
-			"read:any": ["*"],
-			"create:own": ["content", "rating", "imagesUri"],
-			"update:own": ["content", "rating", "imagesUri"],
-			"update:any": ['upVote', 'downVote'],
+			"read:any": ["*", "!status", "!quality"],
+			"create:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:any": ['vote'],
 			"delete:own": ['*'],
 		},
 	},
 	manager: {
 		"review": {
 			"read:any": ["*"],
-			"create:own": ["content", "rating", "imagesUri"],
-			"update:own": ["content", "rating", "imagesUri"],
-			"update:any": ['upVote', 'downVote', 'status'],
+			"create:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:any": ['vote', 'status', 'quality'],
 			"delete:own": ['*'],
 		},
 	},
 	admin: {
 		"review": {
 			"read:any": ["*"],
-			"create:own": ["content", "rating", "imagesUri"],
-			"update:own": ["content", "rating", "imagesUri"],
-			"update:any": ['upVote', 'downVote', 'status'],
+			"create:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:any": ['vote', 'status', 'quality'],
 			"delete:own": ['*'],
 		},
 	},
 	god: {
 		"review": {
 			"read:any": ["*"],
-			"create:own": ["content", "rating", "imagesUri"],
-			"update:own": ["content", "rating", "imagesUri"],
-			"update:any": ['upVote', 'downVote', 'status'],
+			"create:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:own": ["content", "rating", "imagesUri", "serviceGood", "envGood", "comeback"],
+			"update:any": ['vote', 'status', 'quality'],
 			"delete:own": ['*'],
 		},
 	}
 };
 
-const ac = new AccessControl(grants);
-
-ac.lock();
-
-export default ac;
+export default grants;

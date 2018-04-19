@@ -23,4 +23,10 @@ router.get('/', validate(paramValidation.getReviews), reviewController.getReview
 /** POST /api/v1/review - Add new review **/
 router.post('/', validate(paramValidation.addNewReview), reviewController.addNewReview);
 
+/** PUT /api/v1/review - Update review **/
+router.put('/', validate(paramValidation.updateReview), reviewController.updateReview);
+
+/** DELETE /api/v1/review - Delete review **/
+router.delete('/', validate(paramValidation.deleteReview), reviewController.deleteReview);
+
 export default router;

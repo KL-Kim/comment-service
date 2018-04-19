@@ -4,15 +4,33 @@ import passport from 'passport';
 import fs from 'fs';
 import fsx from 'fs-extra';
 import _ from 'lodash';
+import { AccessControl } from 'accesscontrol';
+import grpc from 'grpc';
 
+import businessProto from '../config/grpc.config';
 import BaseController from './base.controller';
 import APIError from '../helper/api-error';
 import Review from '../models/review.model';
-import ac from '../config/rbac.config';
+import grants from '../config/rbac.config';
+import config from '../config/config';
 
 class ReviewController extends BaseController {
   constructor() {
     super();
+
+    this._ac = new AccessControl(grants);
+    this._grpcClient = new businessProto.BusinessService(
+      config.businessGrpcServer.host + ':' + config.businessGrpcServer.port,
+      grpc.credentials.createSsl(
+        config.rootCert,
+        config.grpcPrivateKey,
+        config.grpcPublicKey,
+      ),
+      {
+        'grpc.ssl_target_name_override' : 'ikoreatown.net',
+        'grpc.default_authority': 'ikoreatown.net'
+      }
+    );
   }
 
   /**
@@ -21,25 +39,27 @@ class ReviewController extends BaseController {
    * @property {ObjectId} req.query.uid - user id
    * @property {Number} req.query.skip - Number of reviews to skip
    * @property {Number} req.query.limit - Number of reviews page limit
+   * @property {String} req.query.orderBy - Get list order by new, useful, recommended
    * @property {String} req.query.search - Search term
    */
   getReviews(req, res, next) {
-    const { skip, limit, search, bid, uid } = req.query;
+    const { skip, limit, search, bid, uid, orderBy } = req.query;
 
-    Review.getCount({search, filter: { bid, uid }}).then(totalCount => {
-      req.totalCount = totalCount;
+    Review.getCount({search, filter: { bid, uid }})
+      .then(totalCount => {
+        req.totalCount = totalCount;
 
-      return Review.getList({ skip, limit, search, filter: { bid, uid } })
-    })
-    .then(list => {
-      return res.json({
-        list: list,
-        totalCount: req.totalCount,
+        return Review.getList({ skip, limit, search, filter: { bid, uid }, orderBy });
+      })
+      .then(list => {
+        return res.json({
+          list: list,
+          totalCount: req.totalCount,
+        });
+      })
+      .catch(err => {
+        return next(err);
       });
-    })
-    .catch(err => {
-      return next(err);
-    });
   }
 
   /**
@@ -58,7 +78,9 @@ class ReviewController extends BaseController {
       then(payload => {
         const review = new Review({
           userId: req.body.uid,
+          user: req.body.uid,
           businessId: req.body.bid,
+          business: req.body.bid,
           rating: req.body.rating,
           content: req.body.content,
           serviceGood: req.body.serviceGood,
@@ -73,44 +95,82 @@ class ReviewController extends BaseController {
         return review.save();
       })
       .then(review => {
-        return res.json(review);
+        return Review.getCount({ filter: { bid: req.body.bid } });
+      })
+      .then(count => {
+        req.totalCount = count;
+        return Review.getList({ filter: { bid: req.body.bid }, orderBy: 'new' });
+      })
+      .then(list => {
+        return res.json({
+          totalCount: req.totalCount,
+          list: list,
+        });
+      }).catch(err => {
+        return next(err);
       });
   }
 
   /**
    * Update review
-   * @property {ObjectId} req.body.id - Review id
+   * @property {ObjectId} req.body._id - Review id
    * @property {ObjectId} req.body.uid - User id
    * @property {String} req.body.content  - Review content
    * @property {Number} req.body.rating - Review rating
-   * @property {Number} req.body.upVote - Review upVote
-   * @property {Number} req.body.downVote - Review downVote
+   * @property {String} req.body.vote - Review upVote
    * @property {Object} req.files - Review images
    * @property {String} req.body.status - Only manager, admin and god can update review status
    */
   updateReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
-        req.payload = payload;
-        return Review.getById(req.body.id);
+        req.role = payload;
+        return Review.getById(req.body._id);
       })
       .then(review => {
         if (review) {
-          let permission;
+          let permission, upIndex, downIndex;
 
-          if (review.id.toString() === req.body.uid) {
-            permission = ac.can(payload.role).udpateOwn('review');
+          if (review.userId.toString() === req.body.uid) {
+            permission = this._ac.can(req.role).updateOwn('review');
           } else {
-            permission = ac.can(payload.role).udpateAny('review');
+            permission = this._ac.can(req.role).updateAny('review');
           }
 
           const data = permission.filter(req.body);
 
-          if (data.content)
-            review.content = data.content;
+          if (data.vote === 'upVote') {
+            upIndex = review.upVote.indexOf(req.body.uid);
+            downIndex = review.downVote.indexOf(req.body.uid);
 
-          if (data.rating)
-            review.rating = data.rating;
+            if (upIndex > -1) {
+              review.upVote.splice(upIndex, 1);
+            } else {
+              review.upVote.push(req.body.uid);
+            }
+
+            if (downIndex > -1) {
+              review.downVote.splice(downIndex, 1);
+            }
+
+          } else if (data.vote === 'downVote') {
+            downIndex = review.downVote.indexOf(req.body.uid);
+            upIndex = review.upVote.indexOf(req.body.uid);
+
+            if (downIndex > -1) {
+              review.downVote.splice(downIndex, 1);
+            } else {
+              review.downVote.push(req.body.uid);
+            }
+
+            if (upIndex > -1) {
+              review.upVote.splice(upIndex, 1);
+            }
+          } else {
+            _.map(data, (value, key) => {
+              review[key] = value;
+            });
+          }
 
           if (data.files) {
             //add new images
@@ -123,7 +183,7 @@ class ReviewController extends BaseController {
         }
       })
       .then(review => {
-        return review.json(review);
+        return res.status(204).send();
       })
       .catch(err => {
         return next(err);
@@ -132,31 +192,44 @@ class ReviewController extends BaseController {
 
   /**
    * Delete review
-   * @property {ObjectId} req.body.id - Review id
+   * @property {ObjectId} req.body._id - Review id
    */
   deleteReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
-      .then(payload => {
-        req.payload = payload;
-        return Review.findByIdAndRemove(req.body.id).exec();
+      .then(role => {
+        return Review.getById(req.body._id);
       })
       .then(review => {
         if (review) {
-          // Delete related iamges
+          if (review.userId.toString() !== req.body.uid) {
+            throw new APIError("Forbidden", httpStatus.FORBIDDEN)
+          }
+
+          if (!_.isEmpty(review.imagesUri)) {
+            // Delete related images
+          }
+
+          return review.remove();
         } else {
           throw new APIError("Not found", httpStatus.NOT_FOUND);
         }
       })
+      .then(result => {
+        return Review.getCount({ filter: { uid: req.body.uid } });
+      })
+      .then(count => {
+        req.totalCount = count;
+        return Review.getList({ filter: { uid: req.body.uid }, orderBy: 'new' });
+      })
+      .then(list => {
+        return res.json({
+          totalCount: req.totalCount,
+          list:list,
+        });
+      })
       .catch(err => {
         return next(err);
       });
-  }
-
-  /**
-   * Delete review image
-   */
-  deleteImage(req, res, next) {
-    return res.json("Delete review image");
   }
 
   /**

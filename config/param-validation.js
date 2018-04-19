@@ -15,6 +15,7 @@ export default {
 			limit: Joi.number(),
 			skip: Joi.number(),
 			search: Joi.string().trim().strip().allow(''),
+      orderBy: Joi.string().valid(['new', 'useful', 'recommended', '']),
 		}
   },
 
@@ -28,6 +29,29 @@ export default {
       serviceGood: Joi.boolean(),
       envGood: Joi.boolean(),
       comeback: Joi.boolean(),
+    }
+  },
+
+  // Update review
+  "updateReview": {
+    "body": {
+      _id: Joi.string().hex().required(),
+      uid: Joi.string().hex().required(),
+      rating: Joi.number(),
+      content: Joi.string().trim(),
+      serviceGood: Joi.boolean(),
+      envGood: Joi.boolean(),
+      comeback: Joi.boolean(),
+      vote: Joi.string().valid(['upVote', 'downVote', '']),
+      quality: Joi.number(),
+    }
+  },
+
+  // Delete review
+  "deleteReview": {
+    "body": {
+      _id: Joi.string().hex().required(),
+      uid: Joi.string().hex().required(),
     }
   },
 };

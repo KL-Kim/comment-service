@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 import config from './config';
 
 mongoose.Promise = Promise;
-const mongoUri = `${config.mongo.host}:${config.mongo.port}/comment-serivce`;
+const mongoUri = `${config.mongo.host}:${config.mongo.port}/comment-service`;
 mongoose.connect(mongoUri, {
 	promiseLibrary: Promise,
 	keepAlive: 3000000,

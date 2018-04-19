@@ -3,7 +3,14 @@ import mongoose, { Schema } from 'mongoose';
 import httpStatus from 'http-status';
 import _ from 'lodash';
 
+import config from '../config/config';
 import APIError from '../helper/api-error';
+const businessDB = mongoose.createConnection(config.businessMongo.host + ':' + config.businessMongo.port + '/' + config.businessMongo.name);
+const userDB = mongoose.createConnection(config.userMongo.host + ':' +config.userMongo.port + '/' + config.userMongo.name);
+
+const Business = businessDB.model('Business', {});
+const User = userDB.model('User', {});
+
 
 const ReviewSchema = new Schema({
   "status": {
@@ -13,28 +20,34 @@ const ReviewSchema = new Schema({
     enum: ['normal', 'suspended']
   },
   "quality": {
-    type: String,
+    type: Number,
     required: true,
-    default: "normal",
-    enum: ['normal', 'good'],
+    default: 0,
+    min: 0,
+    max: 9,
   },
   "businessId": {
     type: Schema.Types.ObjectId,
     required: true,
     ref: 'Business'
   },
+  "business": {
+    type: Schema.Types.ObjectId,
+  },
   "userId": {
     type: Schema.Types.ObjectId,
     required: true,
     ref: 'User'
   },
-  "content": {
-    type: String,
-    required: true,
+  "user": {
+    type: Schema.Types.ObjectId,
   },
   "rating": {
     type: Number,
     required: true,
+  },
+  "content": {
+    type: String,
   },
   "serviceGood": {
     type: Boolean,
@@ -56,6 +69,10 @@ const ReviewSchema = new Schema({
   "imagesUri": [{
     type: String
   }],
+  "createdAt": {
+		type: Date,
+		default: Date.now
+	},
 });
 
 /**
@@ -98,8 +115,40 @@ ReviewSchema.statics = {
    * @param {String} search - Search term
 	 * @returns {Promise<Review[]>}
 	 */
-	getList({ skip = 0, limit = 20, search, filter = {} } = {}) {
-    let searchCondition = {};
+	getList({ skip = 0, limit = 20, search, filter = {}, orderBy } = {}) {
+    let order;
+    let conditions, businessCondition, userCondition, searchCondition;
+
+    switch (orderBy) {
+      case "new":
+        order = {
+          "createdAt": -1
+        };
+        break;
+
+      case "useful":
+        order = {
+          "upVote": -1
+        };
+        break;
+
+      default:
+        order = {
+          "quality": 'desc'
+        };
+    }
+
+    if (filter.bid) {
+      businessCondition = {
+        "businessId": filter.bid
+      }
+    }
+
+    if (filter.uid) {
+      userCondition = {
+        "userId": filter.uid
+      };
+    }
 
     const escapedString = _.escapeRegExp(search);
 
@@ -112,8 +161,28 @@ ReviewSchema.statics = {
       }
     }
 
-		return this.find(searchCondition)
-			.sort({ "createdAt": 1 })
+    if (businessCondition || userCondition || searchCondition) {
+      conditions = {
+        "$and": [
+          _.isEmpty(searchCondition) ? {} : searchCondition,
+					_.isEmpty(businessCondition) ? {} : businessCondition,
+          _.isEmpty(userCondition) ? {} : userCondition
+        ]
+      }
+    }
+
+		return this.find(_.isEmpty(conditions) ? {} : conditions)
+			.sort(order)
+      .populate({
+        path: 'business',
+        select: ['krName', 'cnName', 'enName', 'status'],
+        model: Business,
+      })
+      .populate({
+        path: 'user',
+        select: ['username', 'firstName', 'lastName'],
+        model: User,
+      })
 			.exec();
 	},
 
@@ -123,7 +192,7 @@ ReviewSchema.statics = {
 	 * @returns {Promise<Review[]>}
 	 */
   getCount({search, filter = {} } = {}) {
-    let searchCondition = {};
+    let conditions, businessCondition, userCondition, searchCondition;
 
     const escapedString = _.escapeRegExp(search);
 
@@ -136,9 +205,29 @@ ReviewSchema.statics = {
       }
     }
 
-		return this.count(searchCondition)
-			.sort({ "createdAt": 1 })
-			.exec();
+    if (filter.bid) {
+      businessCondition = {
+        "businessId": filter.bid
+      }
+    }
+
+    if (filter.uid) {
+      userCondition = {
+        "userId": filter.uid
+      };
+    }
+
+    if (businessCondition || userCondition || searchCondition) {
+      conditions = {
+        "$and": [
+          _.isEmpty(searchCondition) ? {} : searchCondition,
+					_.isEmpty(businessCondition) ? {} : businessCondition,
+          _.isEmpty(userCondition) ? {} : userCondition
+        ]
+      }
+    }
+
+		return this.count(_.isEmpty(conditions) ? {} : conditions).exec();
   },
 
   /**
