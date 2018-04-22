@@ -29,4 +29,7 @@ router.put('/', validate(paramValidation.updateReview), reviewController.updateR
 /** DELETE /api/v1/review - Delete review **/
 router.delete('/', validate(paramValidation.deleteReview), reviewController.deleteReview);
 
+/** PUT /api/v1/review - Update review **/
+router.put('/vote/:id', validate(paramValidation.voteReview), reviewController.voteReview);
+
 export default router;

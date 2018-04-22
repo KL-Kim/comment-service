@@ -6,33 +6,25 @@ package business;
 
 // Business service definition.
 service BusinessService {
-  rpc getBusiness (businessRequest) returns (stream businessReply) {}
+  rpc addReview (review) returns (business) {}
+
+  rpc updateReview (updatedReview) returns (business) {}
+
+  rpc deleteReview (review) returns (business) {}
 }
 
-message businessRequest {
-  repeated string bid = 1;
+message review {
+  required string bid = 1;
+  required string rid = 2;
+  required int32 rating = 3;
 }
 
-message businessReply {
-  Business business = 1;
+message updatedReview {
+  required string bid = 1;
+  required string rid = 2;
+  required int32 difference = 3;
 }
 
-// Business object
-message Business {
-  string _id = 1;
-  string cnName = 2;
-  string krName = 3;
-  string enName = 4;
-  Status status = 5;
-  Thumbnail thumbnailUri = 6;
-}
-
-enum Status {
-  normal = 0;
-  dissolute = 1;
-}
-
-message Thumbnail {
-  string hd = 1;
-  string default = 2;
+message business {
+  required string businessId = 1;
 }

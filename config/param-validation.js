@@ -25,7 +25,7 @@ export default {
       bid: Joi.string().hex().required(),
       uid: Joi.string().hex().required(),
       rating: Joi.number().required(),
-      content: Joi.string().trim().required(),
+      content: Joi.string().trim().allow(''),
       serviceGood: Joi.boolean(),
       envGood: Joi.boolean(),
       comeback: Joi.boolean(),
@@ -38,11 +38,11 @@ export default {
       _id: Joi.string().hex().required(),
       uid: Joi.string().hex().required(),
       rating: Joi.number(),
-      content: Joi.string().trim(),
+      content: Joi.string().trim().allow(''),
       serviceGood: Joi.boolean(),
       envGood: Joi.boolean(),
       comeback: Joi.boolean(),
-      vote: Joi.string().valid(['upVote', 'downVote', '']),
+      status: Joi.string().valid('normal', 'suspended'),
       quality: Joi.number(),
     }
   },
@@ -54,4 +54,14 @@ export default {
       uid: Joi.string().hex().required(),
     }
   },
+
+  "voteReview": {
+    "params": {
+      id: Joi.string().hex().required(),
+    },
+    "body": {
+      uid: Joi.string().hex().required(),
+      vote: Joi.string().valid(['upVote', 'downVote']),
+    }
+  }
 };

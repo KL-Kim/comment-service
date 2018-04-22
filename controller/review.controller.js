@@ -75,7 +75,9 @@ class ReviewController extends BaseController {
    */
   addNewReview(req, res, next) {
     ReviewController.authenticate(req, res, next).
-      then(payload => {
+      then(role => {
+        if (role !== 'regular') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
         const review = new Review({
           userId: req.body.uid,
           user: req.body.uid,
@@ -95,7 +97,26 @@ class ReviewController extends BaseController {
         return review.save();
       })
       .then(review => {
-        return Review.getCount({ filter: { bid: req.body.bid } });
+        return new Promise((resolve, reject) => {
+          const data = {
+            bid: review.businessId.toString(),
+            rid: review._id.toString(),
+            rating: review.rating,
+          };
+
+          this._grpcClient.addReview(data, (err, response) => {
+            if (err) {
+              review.remove();
+              return reject(err);
+            }
+
+            return resolve(response);
+          });
+        });
+      })
+      .then(response => {
+        if (response.businessId)
+          return Review.getCount({ filter: { bid: req.body.bid } });
       })
       .then(count => {
         req.totalCount = count;
@@ -117,9 +138,9 @@ class ReviewController extends BaseController {
    * @property {ObjectId} req.body.uid - User id
    * @property {String} req.body.content  - Review content
    * @property {Number} req.body.rating - Review rating
-   * @property {String} req.body.vote - Review upVote
    * @property {Object} req.files - Review images
    * @property {String} req.body.status - Only manager, admin and god can update review status
+   * @property {Number} req.body.quality - Only manager, admin and god can update review quality
    */
   updateReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
@@ -128,62 +149,88 @@ class ReviewController extends BaseController {
         return Review.getById(req.body._id);
       })
       .then(review => {
-        if (review) {
-          let permission, upIndex, downIndex;
+        if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
 
-          if (review.userId.toString() === req.body.uid) {
-            permission = this._ac.can(req.role).updateOwn('review');
-          } else {
-            permission = this._ac.can(req.role).updateAny('review');
-          }
+        let permission, difference;
+        req.bid = review.businessId;
 
-          const data = permission.filter(req.body);
-
-          if (data.vote === 'upVote') {
-            upIndex = review.upVote.indexOf(req.body.uid);
-            downIndex = review.downVote.indexOf(req.body.uid);
-
-            if (upIndex > -1) {
-              review.upVote.splice(upIndex, 1);
-            } else {
-              review.upVote.push(req.body.uid);
-            }
-
-            if (downIndex > -1) {
-              review.downVote.splice(downIndex, 1);
-            }
-
-          } else if (data.vote === 'downVote') {
-            downIndex = review.downVote.indexOf(req.body.uid);
-            upIndex = review.upVote.indexOf(req.body.uid);
-
-            if (downIndex > -1) {
-              review.downVote.splice(downIndex, 1);
-            } else {
-              review.downVote.push(req.body.uid);
-            }
-
-            if (upIndex > -1) {
-              review.upVote.splice(upIndex, 1);
-            }
-          } else {
-            _.map(data, (value, key) => {
-              review[key] = value;
-            });
-          }
-
-          if (data.files) {
-            //add new images
-          }
-
-          return review.save();
-
+        if (review.userId.toString() === req.body.uid) {
+          permission = this._ac.can(req.role).updateOwn('review');
+          req.isOwn = true;
         } else {
-          throw new APIError("Not found", httpStatus.NOT_FOUND);
+          permission = this._ac.can(req.role).updateAny('review');
+          req.isOwn = false;
         }
+
+        const data = permission.filter(req.body);
+
+        if (_.isEmpty(data)) return review;
+
+        _.map(data, (value, key) => {
+          if (key === 'rating') {
+            difference = data.rating - review.rating;
+          }
+
+          review[key] = value;
+        });
+
+
+        if (!_.isUndefined(difference) && difference !== 0) {
+          return new Promise((resolve, reject) => {
+            const data = {
+              rid: review._id.toString(),
+              bid: review.businessId.toString(),
+              difference: difference,
+            };
+
+            this._grpcClient.updateReview(data, (err, response) => {
+              if (err) {
+                return reject(err);
+              }
+
+              return resolve(review);
+            });
+          });
+        }
+
+        if (data.files) {
+          //add new images
+        }
+
+        return review;
       })
       .then(review => {
-        return res.status(204).send();
+        return review.save();
+      })
+      .then(review => {
+        let filter = {};
+
+        if (req.isOwn) {
+          filter = {
+            uid: req.body.uid
+          }
+        }
+
+        return Review.getCount({ filter: filter });
+      })
+      .then(count => {
+        req.totalCount = count;
+
+        let filter = {};
+
+        if (req.isOwn) {
+          filter = {
+            uid: req.body.uid
+          }
+        }
+
+        return Review.getList({ filter: filter, orderBy: 'new' });
+      })
+      .then(list => {
+        return res.json({
+          totalCount: req.totalCount,
+          list:list,
+        });
       })
       .catch(err => {
         return next(err);
@@ -193,6 +240,7 @@ class ReviewController extends BaseController {
   /**
    * Delete review
    * @property {ObjectId} req.body._id - Review id
+   * @property {ObjectId} req.body.uid - User's id
    */
   deleteReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
@@ -200,31 +248,123 @@ class ReviewController extends BaseController {
         return Review.getById(req.body._id);
       })
       .then(review => {
-        if (review) {
-          if (review.userId.toString() !== req.body.uid) {
-            throw new APIError("Forbidden", httpStatus.FORBIDDEN)
-          }
+        if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
 
-          if (!_.isEmpty(review.imagesUri)) {
-            // Delete related images
-          }
 
-          return review.remove();
-        } else {
-          throw new APIError("Not found", httpStatus.NOT_FOUND);
+        if (review.userId.toString() !== req.body.uid) {
+          throw new APIError("Forbidden", httpStatus.FORBIDDEN)
         }
+
+        return new Promise((resolve, reject) => {
+          const data = {
+            bid: review.businessId.toString(),
+            rid: review._id.toString(),
+            rating: review.rating,
+          };
+
+          this._grpcClient.deleteReview(data, (err, response) => {
+            if (err) {
+              return reject(err);
+            }
+
+            return resolve(review);
+          });
+        });
+      })
+      .then(review => {
+        if (!_.isEmpty(review.imagesUri)) {
+          // Delete related images
+        }
+        return review.remove();
       })
       .then(result => {
-        return Review.getCount({ filter: { uid: req.body.uid } });
+        return Review.getCount({
+          filter: {
+            uid: req.body.uid
+          }
+        });
       })
       .then(count => {
         req.totalCount = count;
-        return Review.getList({ filter: { uid: req.body.uid }, orderBy: 'new' });
+        return Review.getList({
+          "filter": {
+            uid: req.body.uid
+          },
+          "orderBy": 'new'
+        });
       })
       .then(list => {
         return res.json({
           totalCount: req.totalCount,
           list:list,
+        });
+      })
+      .catch(err => {
+        return next(err);
+      });
+  }
+
+  /**
+   * Vote review
+   */
+  voteReview(req, res, next) {
+    ReviewController.authenticate(req, res, next)
+      .then(payload => {
+        req.role = payload;
+        return Review.getById(req.params.id);
+      })
+      .then(review => {
+        if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
+
+        if (review.userId.toString() === req.body.uid) {
+          throw new APIError("Forbidden", httpStatus.FORBIDDEN)
+        }
+
+        req.bid = review.businessId;
+        let upIndex, downIndex;
+        let permission = this._ac.can(req.role).updateAny('review');
+
+        if (req.body.vote === 'upVote') {
+          upIndex = review.upVote.indexOf(req.body.uid);
+          downIndex = review.downVote.indexOf(req.body.uid);
+
+          if (upIndex > -1) {
+            review.upVote.splice(upIndex, 1);
+          } else {
+            review.upVote.push(req.body.uid);
+          }
+
+          if (downIndex > -1) {
+            review.downVote.splice(downIndex, 1);
+          }
+
+        } else if (req.body.vote === 'downVote') {
+          downIndex = review.downVote.indexOf(req.body.uid);
+          upIndex = review.upVote.indexOf(req.body.uid);
+
+          if (downIndex > -1) {
+            review.downVote.splice(downIndex, 1);
+          } else {
+            review.downVote.push(req.body.uid);
+          }
+
+          if (upIndex > -1) {
+            review.upVote.splice(upIndex, 1);
+          }
+        }
+
+        return review.save();
+      })
+      .then(review => {
+        return Review.getList({
+          filter: {
+            bid: req.bid
+          }
+        });
+      })
+      .then(list => {
+        return res.json({
+          list: list
         });
       })
       .catch(err => {
