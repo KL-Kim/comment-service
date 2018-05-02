@@ -115,7 +115,7 @@ ReviewSchema.statics = {
    * @param {String} search - Search term
 	 * @returns {Promise<Review[]>}
 	 */
-	getList({ skip = 0, limit = 20, search, filter = {}, orderBy } = {}) {
+	getList({ skip = 0, limit = 8, search, filter = {}, orderBy } = {}) {
     let order;
     let conditions, businessCondition, userCondition, searchCondition;
 
@@ -128,13 +128,14 @@ ReviewSchema.statics = {
 
       case "useful":
         order = {
-          "upVote": -1
+          "upVote": -1,
         };
         break;
 
       default:
         order = {
-          "quality": 'desc'
+          "quality": 'desc',
+          "createdAt": -1
         };
     }
 
@@ -172,6 +173,8 @@ ReviewSchema.statics = {
     }
 
 		return this.find(_.isEmpty(conditions) ? {} : conditions)
+      .skip(skip)
+      .limit(limit)
 			.sort(order)
       .populate({
         path: 'business',

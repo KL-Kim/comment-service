@@ -356,15 +356,8 @@ class ReviewController extends BaseController {
         return review.save();
       })
       .then(review => {
-        return Review.getList({
-          filter: {
-            bid: req.bid
-          }
-        });
-      })
-      .then(list => {
         return res.json({
-          list: list
+          review: review
         });
       })
       .catch(err => {
