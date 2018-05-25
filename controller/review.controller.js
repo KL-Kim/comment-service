@@ -7,7 +7,7 @@ import _ from 'lodash';
 import { AccessControl } from 'accesscontrol';
 import grpc from 'grpc';
 
-import businessProto from '../config/grpc.config';
+import { businessProto, notificationProto } from '../config/grpc.client';
 import BaseController from './base.controller';
 import APIError from '../helper/api-error';
 import Review from '../models/review.model';
@@ -19,7 +19,7 @@ class ReviewController extends BaseController {
     super();
 
     this._ac = new AccessControl(grants);
-    this._grpcClient = new businessProto.BusinessService(
+    this._businessGrpcClient = new businessProto.BusinessService(
       config.businessGrpcServer.host + ':' + config.businessGrpcServer.port,
       grpc.credentials.createSsl(
         config.rootCert,
@@ -31,6 +31,23 @@ class ReviewController extends BaseController {
         'grpc.default_authority': 'ikoreatown.net'
       }
     );
+
+    this._businessGrpcClient.waitForReady(Infinity, (err) => {
+      if (err) console.error(err);
+
+      console.log("Business gRPC Server connected succesfully!");
+    });
+
+    this._notificationGrpcClient = new notificationProto.NotificationService(
+      config.notificationGrpcServer.host + ':' + config.notificationGrpcServer.port,
+      grpc.credentials.createInsecure()
+    );
+
+    this._notificationGrpcClient.waitForReady(Infinity, (err) => {
+      if (err) console.error(err);
+
+      console.log("Notification gRPC Server connected succesfully!");
+    });
   }
 
   /**
@@ -55,6 +72,22 @@ class ReviewController extends BaseController {
         return res.json({
           list: list,
           totalCount: req.totalCount,
+        });
+      })
+      .catch(err => {
+        return next(err);
+      });
+  }
+
+  /**
+   * Get single review
+   * @property {ObjectId} req.params.id - Review id
+   */
+  getSingleReview(req, res, next) {
+    Review.getById(req.params.id)
+      .then(review => {
+        return res.json({
+          review: review
         });
       })
       .catch(err => {
@@ -104,7 +137,7 @@ class ReviewController extends BaseController {
             rating: review.rating,
           };
 
-          this._grpcClient.addReview(data, (err, response) => {
+          this._businessGrpcClient.addReview(data, (err, response) => {
             if (err) {
               review.remove();
               return reject(err);
@@ -144,8 +177,8 @@ class ReviewController extends BaseController {
    */
   updateReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
-      .then(payload => {
-        req.role = payload;
+      .then(role => {
+        req.role = role;
         return Review.getById(req.body._id);
       })
       .then(review => {
@@ -183,7 +216,7 @@ class ReviewController extends BaseController {
               difference: difference,
             };
 
-            this._grpcClient.updateReview(data, (err, response) => {
+            this._businessGrpcClient.updateReview(data, (err, response) => {
               if (err) {
                 return reject(err);
               }
@@ -262,7 +295,7 @@ class ReviewController extends BaseController {
             rating: review.rating,
           };
 
-          this._grpcClient.deleteReview(data, (err, response) => {
+          this._businessGrpcClient.deleteReview(data, (err, response) => {
             if (err) {
               return reject(err);
             }
@@ -306,6 +339,11 @@ class ReviewController extends BaseController {
 
   /**
    * Vote review
+   * @property {ObjectId} req.params.id - Review id
+   * @property {String} req.body.vote - Vote review
+   * @property {ObjectId} req.body.uid - User id
+   * @property {String} req.body.businessName - Business name
+   * @property {String} req.body.businessSlug - Business slug
    */
   voteReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
@@ -321,38 +359,52 @@ class ReviewController extends BaseController {
         }
 
         req.bid = review.businessId;
-        let upIndex, downIndex;
+        let upIndex;
         let permission = this._ac.can(req.role).updateAny('review');
 
         if (req.body.vote === 'upVote') {
           upIndex = review.upVote.indexOf(req.body.uid);
-          downIndex = review.downVote.indexOf(req.body.uid);
 
           if (upIndex > -1) {
             review.upVote.splice(upIndex, 1);
+
+            return new Promise((resolve, reject) => {
+              this._notificationGrpcClient.addNotification({
+                userId: review.userId.toString(),
+                senderId: req.body.uid,
+                type: "REVIEW",
+                event: "CANCEL_UPVOTE",
+                subjectUrl: req.body.businessSlug,
+                subjectTitle: req.body.businessName,
+                commentId: review._id.toString(),
+              }, (err, response) => {
+                if (err) reject(err);
+
+                resolve(review);
+              });
+            });
           } else {
             review.upVote.push(req.body.uid);
-          }
 
-          if (downIndex > -1) {
-            review.downVote.splice(downIndex, 1);
-          }
+            return new Promise((resolve, reject) => {
+              this._notificationGrpcClient.addNotification({
+                userId: review.userId.toString(),
+                senderId: req.body.uid,
+                type: "REVIEW",
+                event: "UPVOTE",
+                subjectUrl: req.body.businessSlug,
+                subjectTitle: req.body.businessName,
+                commentId: review._id.toString(),
+              }, (err, response) => {
+                if (err) reject(err);
 
-        } else if (req.body.vote === 'downVote') {
-          downIndex = review.downVote.indexOf(req.body.uid);
-          upIndex = review.upVote.indexOf(req.body.uid);
-
-          if (downIndex > -1) {
-            review.downVote.splice(downIndex, 1);
-          } else {
-            review.downVote.push(req.body.uid);
-          }
-
-          if (upIndex > -1) {
-            review.upVote.splice(upIndex, 1);
+                resolve(review);
+              });
+            });
           }
         }
-
+      })
+      .then(review => {
         return review.save();
       })
       .then(review => {

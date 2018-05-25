@@ -20,6 +20,9 @@ validate.options({
 /** GET /api/v1/review - Get list of reviews **/
 router.get('/', validate(paramValidation.getReviews), reviewController.getReviews);
 
+/** GET /api/v1/review/single/:id - Get single review **/
+router.get('/single/:id', validate(paramValidation.getSingleReview), reviewController.getSingleReview);
+
 /** POST /api/v1/review - Add new review **/
 router.post('/', validate(paramValidation.addNewReview), reviewController.addNewReview);
 

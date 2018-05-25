@@ -37,6 +37,9 @@ function setConfig() {
 		BUSINESS_GRPC_HOST: Joi.string().default('localhost'),
 		BUSINESS_GRPC_PORTL: Joi.number().default(50051),
 
+		NOTIFICATION_GRPC_HOST: Joi.string().default('0.0.0.0'),
+		NOTIFICATION_GRPC_PORT: Joi.number().default(50052),
+
 		ACCESS_JWT_ALGORITHM: Joi.string().default('RS256'),
 		ACCESS_JWT_ISSUER: Joi.string().allow(''),
 		ACCESS_JWT_AUDIENCE: Joi.string().allow(''),
@@ -75,6 +78,10 @@ function setConfig() {
 		businessGrpcServer: {
 			host: envVars.BUSINESS_GRPC_HOST,
 			port: envVars.BUSINESS_GRPC_PORT,
+		},
+		notificationGrpcServer: {
+			host: envVars.NOTIFICATION_GRPC_HOST,
+			port: envVars.NOTIFICATION_GRPC_PORT,
 		},
 		accessTokenOptions: {
 			algorithm: envVars.ACCESS_JWT_ALGORITHM,

@@ -6,11 +6,10 @@ import _ from 'lodash';
 import config from '../config/config';
 import APIError from '../helper/api-error';
 const businessDB = mongoose.createConnection(config.businessMongo.host + ':' + config.businessMongo.port + '/' + config.businessMongo.name);
-const userDB = mongoose.createConnection(config.userMongo.host + ':' +config.userMongo.port + '/' + config.userMongo.name);
+const userDB = mongoose.createConnection(config.userMongo.host + ':' + config.userMongo.port + '/' + config.userMongo.name);
 
 const Business = businessDB.model('Business', {});
 const User = userDB.model('User', {});
-
 
 const ReviewSchema = new Schema({
   "status": {
@@ -59,10 +58,6 @@ const ReviewSchema = new Schema({
     type: Boolean,
   },
   "upVote": [{
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  "downVote": [{
     type: Schema.Types.ObjectId,
     ref: 'User'
   }],
@@ -239,7 +234,13 @@ ReviewSchema.statics = {
    * @return {Promise<Review>}
    */
   getById(id) {
-    return this.findById(id).exec();
+    return this.findById(id)
+      .populate({
+        path: 'business',
+        select: ['krName', 'cnName', 'enName', 'status'],
+        model: Business,
+      })
+      .exec();
   },
 
 };

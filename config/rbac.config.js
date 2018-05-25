@@ -6,7 +6,7 @@
 const grants = {
 	guest: {
 		"review": {
-			"read:any": ["*"],
+			"read:any": ["*", "!status", "!quality"],
 		},
 	},
 	regular: {

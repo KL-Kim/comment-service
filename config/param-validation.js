@@ -19,6 +19,13 @@ export default {
 		}
   },
 
+  // Get single review
+  "getSingleReview": {
+    "params": {
+      id: Joi.string().hex().required(),
+    }
+  },
+
   // Add new review
   "addNewReview": {
     "body": {
@@ -62,6 +69,8 @@ export default {
     "body": {
       uid: Joi.string().hex().required(),
       vote: Joi.string().valid(['upVote', 'downVote']),
+      businessName: Joi.string().trim(),
+      businessSlug: Joi.string().trim(),
     }
-  }
+  },
 };

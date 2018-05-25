@@ -11,6 +11,10 @@ service BusinessService {
   rpc updateReview (updatedReview) returns (business) {}
 
   rpc deleteReview (review) returns (business) {}
+
+  rpc addToFavoredUser (favorItem) returns (business) {}
+
+  rpc removeFromFavoredUser (favorItem) returns (business) {}
 }
 
 message review {
@@ -27,4 +31,9 @@ message updatedReview {
 
 message business {
   required string businessId = 1;
+}
+
+message favorItem {
+  required string uid = 1;
+  required string bid = 2;
 }

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option objc_class_prefix = "NOTIFICATION";
+
+package notification;
+
+// Notification service definition.
+service NotificationService {
+  rpc addNotification (message) returns (response) {}
+}
+
+message message {
+  required string userId = 1;
+  string senderId = 2;
+  required string type = 3;
+  required string event = 4;
+  required string subjectTitle = 5;
+  string subjectContent = 6;
+  string commentId = 7;
+  string commentContent = 8;
+  string subjectUrl = 9;
+}
+
+message response {
+  required string result = 1;
+}
