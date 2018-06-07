@@ -96,7 +96,6 @@ ReviewSchema.methods = {
   toJSON() {
 		let obj = this.toObject();
 		delete obj.__v;
-		delete obj.createdAt;
 		return obj;
 	},
 };
@@ -107,10 +106,15 @@ ReviewSchema.methods = {
 ReviewSchema.statics = {
   /**
 	 * List reviews in descending order of 'createdAt' timestamp.
-   * @param {String} search - Search term
+   * @property {String} search - Search term
+   * @property {String} orderBy - List sort
+   * @property {Number} skip - Number of list to skip
+   * @property {Number} limit - Number of list to limit
+   * @property {ObjectId} fitler.bid - Business id
+   * @property {ObjectId} filter.uid - User id
 	 * @returns {Promise<Review[]>}
 	 */
-	getList({ skip = 0, limit = 8, search, filter = {}, orderBy } = {}) {
+	getList({ skip = 0, limit = 10, search, filter = {}, orderBy } = {}) {
     let order;
     let conditions, businessCondition, userCondition, searchCondition;
 
@@ -178,7 +182,7 @@ ReviewSchema.statics = {
       })
       .populate({
         path: 'user',
-        select: ['username', 'firstName', 'lastName'],
+        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
         model: User,
       })
 			.exec();
@@ -187,9 +191,11 @@ ReviewSchema.statics = {
   /**
 	 * Total count of requested reviews
    * @param {String} search - Search term
+   * @property {ObjectId} filter.bid - Business id
+   * @property {ObjectId} fitler.uid - User id
 	 * @returns {Promise<Review[]>}
 	 */
-  getCount({search, filter = {} } = {}) {
+  getCount({ search, filter = {} } = {}) {
     let conditions, businessCondition, userCondition, searchCondition;
 
     const escapedString = _.escapeRegExp(search);

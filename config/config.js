@@ -103,7 +103,6 @@ function setConfig() {
 		throw err;
 	}
 
-
 	return config;
 }
 

@@ -109,7 +109,7 @@ class ReviewController extends BaseController {
   addNewReview(req, res, next) {
     ReviewController.authenticate(req, res, next).
       then(role => {
-        if (role !== 'regular') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+        if (_.isUndefined(role)) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         const review = new Review({
           userId: req.body.uid,
@@ -283,7 +283,6 @@ class ReviewController extends BaseController {
       .then(review => {
         if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
 
-
         if (review.userId.toString() !== req.body.uid) {
           throw new APIError("Forbidden", httpStatus.FORBIDDEN)
         }
@@ -426,7 +425,7 @@ class ReviewController extends BaseController {
  				if (err) return reject(err);
  				if (info) return reject(new APIError(info.message, httpStatus.UNAUTHORIZED));
 
-        if (payload.uid !== req.body.uid) {
+        if (!payload.isVerified && payload.uid !== req.body.uid) {
           reject(new APIError("Forbidden", httpStatus.FORBIDDEN));
         } else {
           return resolve(payload.role);

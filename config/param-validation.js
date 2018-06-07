@@ -62,6 +62,7 @@ export default {
     }
   },
 
+  // Vote review
   "voteReview": {
     "params": {
       id: Joi.string().hex().required(),
@@ -71,6 +72,51 @@ export default {
       vote: Joi.string().valid(['upVote', 'downVote']),
       businessName: Joi.string().trim(),
       businessSlug: Joi.string().trim(),
+    }
+  },
+
+  /** GET /api/v1/comment - Get list of comments **/
+  "getCommentsList": {
+    "query": {
+      skip: Joi.number(),
+      limit: Joi.number(),
+			search: Joi.string().trim().strip().allow(''),
+      uid: Joi.string().hex(),
+      pid: Joi.string().hex(),
+      status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
+      parentId: Joi.string().hex(),
+    },
+  },
+
+  /** POST /api/v1/comment - Add new comment **/
+  "addNewComment": {
+    "body": {
+      uid: Joi.string().hex().required(),
+      pid: Joi.string().hex().required(),
+      content: Joi.string().trim(),
+      parentId: Joi.string().hex(),
+      replyToComment: Joi.string().hex(),
+      replyToUser: Joi.string().hex(),
+    }
+  },
+
+  /** DELETE /api/v1/comment/:id - Delete comment **/
+  "deleteComment": {
+    "params": {
+      id: Joi.string().hex().required(),
+    },
+    "body": {
+      uid: Joi.string().hex().required(),
+    }
+  },
+
+  /** PUT /api/v1/admin/comment/:id - Update comment by admin **/
+  "updateCommentByAdmin": {
+    "params": {
+      id: Joi.string().hex().required(),
+    },
+    "body": {
+      status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
     }
   },
 };

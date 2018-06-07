@@ -4,42 +4,55 @@ import httpStatus from 'http-status';
 import _ from 'lodash';
 
 import APIError from '../helper/api-error';
+import config from '../config/config';
+
+const userDB = mongoose.createConnection(config.userMongo.host + ':' + config.userMongo.port + '/' + config.userMongo.name);
+const User = userDB.model('User', {});
 
 const CommentSchema = new Schema({
   "status": {
     type: String,
     required: true,
-    enum: ['normal', 'suspended']
-  },
-  "itemId": {
-    type: Schema.Types.ObjectId,
-    required: true,
+    default: 'NORMAL',
+    enum: ['NORMAL', 'SUSPENDED']
   },
   "userId": {
     type: Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
     required: true,
   },
-  "title": {
-    type: String,
+  "postId": {
+    type: Schema.Types.ObjectId,
+    'ref': 'Post',
     required: true,
-  },
-  "content": {
-    type: String,
   },
   "parentId": {
     type: Schema.Types.ObjectId,
     ref: 'Comment'
   },
-  "upVote": {
-    type: Number,
-    required: true,
-    default: 0,
+  "replyToComment": {
+    type: Schema.Types.ObjectId,
+    ref: 'Comment'
   },
-  "downVote": {
-    type: Number,
+  "replyToUser":{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  "content": {
+    type: String,
     required: true,
-    default: 0,
+  },
+  "upVote": [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  "downVote": [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  "createdAt": {
+    type: Date,
+    default: Date.now()
   },
 });
 
@@ -47,9 +60,7 @@ const CommentSchema = new Schema({
  * Index
  */
 CommentSchema.index({
-  "itemId": 1,
-  "userId": 1,
-  "title": "text",
+  "postId": 1,
   "content": "text",
 });
 
@@ -69,7 +80,6 @@ CommentSchema.methods = {
   toJSON() {
 		let obj = this.toObject();
 		delete obj.__v;
-		delete obj.createdAt;
 		return obj;
 	},
 };
@@ -83,34 +93,69 @@ CommentSchema.statics = {
    * @param {String} search - Search term
 	 * @returns {Promise<Comment[]>}
 	 */
-	getList(search) {
-    let searchCondition = {};
+	getList({ skip, limit, search, filter = {} } = {}) {
+    let conditions,
+        userCondition,
+        postCondition,
+        statusCondition,
+        searchCondition;
+
+    if (filter.userId) {
+      userCondition = {
+        "userId": filter.userId
+      };
+    }
+
+    if (filter.status) {
+      statusCondition = {
+        "status": filter.status
+      };
+    }
+
+    if (filter.postId) {
+      postCondition = {
+        "postId": filter.postId
+      };
+    }
 
     const escapedString = _.escapeRegExp(search);
 
-    if (escapedString)
+    if (escapedString) {
       searchCondition = {
-        $or: [
-          {
-            "title": {
-              $regex: escapedString,
-							$options: 'i'
-            }
-          },
-          {
-            "content": {
-              $regex: escapedString,
-							$options: 'i'
-            }
-          }
+        "content": {
+          $regex: escapedString,
+					$options: 'i'
+        }
+      };
+    }
+
+    if (searchCondition || statusCondition || userCondition || postCondition) {
+      conditions = {
+        "$and": [
+          _.isEmpty(searchCondition) ? {} : searchCondition,
+          _.isEmpty(userCondition) ? {} : userCondition,
+          _.isEmpty(postCondition)? {} : postCondition,
+          _.isEmpty(statusCondition)? {} : statusCondition,
         ]
       }
     }
 
-		return this.find(searchCondition)
-			.sort({ "createdAt": 1 })
+		return this.find(_.isEmpty(conditions) ? {} : conditions)
+			.sort({ "createdAt": -1 })
+      .populate({
+        path: 'userId',
+        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        model: User,
+      })
 			.exec();
 	},
+
+  /**
+   * Get comments count
+   */
+  getCount() {
+    return this.count().exec();
+  },
 
   /**
    * Get comment by id
@@ -118,7 +163,13 @@ CommentSchema.statics = {
    * @return {Promise<Comment>}
    */
   getById(id) {
-    return this.findById(id).exec();
+    return this.findById(id)
+      .populate({
+        path: 'userId',
+        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        model: User,
+      })
+      .exec();
   },
 
 };
