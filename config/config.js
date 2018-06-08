@@ -31,6 +31,10 @@ function setConfig() {
 		USER_MONGO_PORT: Joi.number().default(27017),
 		USER_MONGO_NAME: Joi.string().default('user-service'),
 
+		BLOG_MONGO_HOST: Joi.string().default('mongodb://localhost'),
+		BLOG_MONGO_PORT: Joi.number().default(27017),
+		BLOG_MONGO_NAME: Joi.string().default('blog-service'),
+
 		WEB_SERVICE_HOST: Joi.string(),
 		WEB_SERVICE_PORT: Joi.number().default(80),
 
@@ -68,6 +72,11 @@ function setConfig() {
 			host: envVars.USER_MONGO_HOST,
 			port: envVars.USER_MONGO_PORT,
 			name: envVars.USER_MONGO_NAME,
+		},
+		blogMongo: {
+			host: envVars.BLOG_MONGO_HOST,
+			port: envVars.BLOG_MONGO_PORT,
+			name: envVars.BLOG_MONGO_NAME,
 		},
 		webService: {
 			host: envVars.WEB_SERVICE_HOST,

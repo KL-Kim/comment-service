@@ -6,8 +6,10 @@ import _ from 'lodash';
 import APIError from '../helper/api-error';
 import config from '../config/config';
 
+const blogDB = mongoose.createConnection(config.blogMongo.host + ':' + config.blogMongo.port + '/' + config.blogMongo.name);
 const userDB = mongoose.createConnection(config.userMongo.host + ':' + config.userMongo.port + '/' + config.userMongo.name);
 const User = userDB.model('User', {});
+const Post = blogDB.model('Post', {});
 
 const CommentSchema = new Schema({
   "status": {
@@ -146,6 +148,11 @@ CommentSchema.statics = {
         path: 'userId',
         select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
         model: User,
+      })
+      .populate({
+        path: 'postId',
+        select: ['title', 'status'],
+        model: Post,
       })
 			.exec();
 	},
