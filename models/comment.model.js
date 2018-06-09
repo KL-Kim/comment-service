@@ -32,10 +32,6 @@ const CommentSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Comment'
   },
-  "replyToComment": {
-    type: Schema.Types.ObjectId,
-    ref: 'Comment'
-  },
   "replyToUser":{
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -44,17 +40,17 @@ const CommentSchema = new Schema({
     type: String,
     required: true,
   },
-  "upVote": [{
+  "upvote": [{
     type: Schema.Types.ObjectId,
     ref: 'User'
   }],
-  "downVote": [{
+  "downvote": [{
     type: Schema.Types.ObjectId,
     ref: 'User'
   }],
   "createdAt": {
     type: Date,
-    default: Date.now()
+    default: Date.now
   },
 });
 
@@ -95,7 +91,91 @@ CommentSchema.statics = {
    * @param {String} search - Search term
 	 * @returns {Promise<Comment[]>}
 	 */
-	getList({ skip, limit, search, filter = {} } = {}) {
+	getList({ skip, limit, search, filter = {}, orderBy } = {}) {
+    let conditions,
+        userCondition,
+        postCondition,
+        statusCondition,
+        searchCondition,
+        sort;
+
+    switch (orderBy) {
+      case 'new':
+        sort = {
+          "createdAt": -1
+        };
+        break;
+
+      default:
+        sort = {
+          "upVote": -1,
+          "createdAt": -1
+        }
+    }
+
+    if (filter.postId) {
+      postCondition = {
+        "postId": filter.postId
+      };
+    }
+
+    if (filter.userId) {
+      userCondition = {
+        "userId": filter.userId
+      };
+    }
+
+    if (filter.status) {
+      statusCondition = {
+        "status": filter.status
+      };
+    } else {
+      statusCondition = {
+        "status": 'NORMAL'
+      };
+    }
+
+    const escapedString = _.escapeRegExp(search);
+
+    if (escapedString) {
+      searchCondition = {
+        "content": {
+          $regex: escapedString,
+					$options: 'i'
+        }
+      };
+    }
+
+    if (searchCondition || statusCondition || userCondition || postCondition) {
+      conditions = {
+        "$and": [
+          _.isEmpty(searchCondition) ? {} : searchCondition,
+          _.isEmpty(userCondition) ? {} : userCondition,
+          _.isEmpty(postCondition)? {} : postCondition,
+          _.isEmpty(statusCondition)? {} : statusCondition,
+        ]
+      }
+    }
+
+		return this.find(_.isEmpty(conditions) ? {} : conditions)
+			.sort(sort)
+      .populate({
+        path: 'userId',
+        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        model: User,
+      })
+      .populate({
+        path: 'postId',
+        select: ['title', 'status'],
+        model: Post,
+      })
+			.exec();
+	},
+
+  /**
+   * Get comments count
+   */
+  getCount({ search, filter = {} } = {}) {
     let conditions,
         userCondition,
         postCondition,
@@ -111,6 +191,10 @@ CommentSchema.statics = {
     if (filter.status) {
       statusCondition = {
         "status": filter.status
+      };
+    } else {
+      statusCondition = {
+        "status": 'NORMAL'
       };
     }
 
@@ -142,26 +226,7 @@ CommentSchema.statics = {
       }
     }
 
-		return this.find(_.isEmpty(conditions) ? {} : conditions)
-			.sort({ "createdAt": -1 })
-      .populate({
-        path: 'userId',
-        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
-        model: User,
-      })
-      .populate({
-        path: 'postId',
-        select: ['title', 'status'],
-        model: Post,
-      })
-			.exec();
-	},
-
-  /**
-   * Get comments count
-   */
-  getCount() {
-    return this.count().exec();
+    return this.count(_.isEmpty(conditions) ? {} : conditions).exec();
   },
 
   /**

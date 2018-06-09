@@ -16,6 +16,9 @@ router.post('/', validate(paramValidation.addNewComment), commentController.addN
 /** DELETE /api/v1/comment/:id - Delete comment **/
 router.delete('/:id', validate(paramValidation.deleteComment), commentController.deleteComment);
 
+/** POST /api/v1/comment/vote/:id - Vote comment **/
+router.post('/vote/:id', validate(paramValidation.voteComment), commentController.voteComment);
+
 /** PUT /api/v1/admin/comment/:id - Update comment by admin **/
 router.put('/admin/:id', validate(paramValidation.updateCommentByAdmin), commentController.updateCommentByAdmin);
 

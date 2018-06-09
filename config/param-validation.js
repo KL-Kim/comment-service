@@ -69,7 +69,7 @@ export default {
     },
     "body": {
       uid: Joi.string().hex().required(),
-      vote: Joi.string().valid(['upVote', 'downVote']),
+      vote: Joi.string().valid(['upvote', 'downvote']),
       businessName: Joi.string().trim(),
       businessSlug: Joi.string().trim(),
     }
@@ -95,7 +95,6 @@ export default {
       pid: Joi.string().hex().required(),
       content: Joi.string().trim(),
       parentId: Joi.string().hex(),
-      replyToComment: Joi.string().hex(),
       replyToUser: Joi.string().hex(),
     }
   },
@@ -117,6 +116,18 @@ export default {
     },
     "body": {
       status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
+    }
+  },
+
+  // Vote comment
+  "voteComment": {
+    "params": {
+      id: Joi.string().hex().required(),
+    },
+    "body": {
+      uid: Joi.string().hex().required(),
+      vote: Joi.string().valid(['UPVOTE', 'DOWNVOTE']),
+      postTitle: Joi.string().trim(),
     }
   },
 };

@@ -35,7 +35,7 @@ class ReviewController extends BaseController {
     this._businessGrpcClient.waitForReady(Infinity, (err) => {
       if (err) console.error(err);
 
-      console.log("Business gRPC Server connected succesfully!");
+      console.log("Review controller connect Business gRPC Server succesfully!");
     });
 
     this._notificationGrpcClient = new notificationProto.NotificationService(
@@ -46,7 +46,7 @@ class ReviewController extends BaseController {
     this._notificationGrpcClient.waitForReady(Infinity, (err) => {
       if (err) console.error(err);
 
-      console.log("Notification gRPC Server connected succesfully!");
+      console.log("Review controller connect Notification gRPC Server succesfully!");
     });
   }
 
@@ -108,8 +108,8 @@ class ReviewController extends BaseController {
    */
   addNewReview(req, res, next) {
     ReviewController.authenticate(req, res, next).
-      then(role => {
-        if (_.isUndefined(role)) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+      then(payload => {
+        if (payload.uid !== req.boby.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         const review = new Review({
           userId: req.body.uid,
@@ -177,8 +177,10 @@ class ReviewController extends BaseController {
    */
   updateReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
-      .then(role => {
-        req.role = role;
+      .then(payload => {
+        if (payload.uid !== req.boby.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
+        req.role = payload.role;
         return Review.getById(req.body._id);
       })
       .then(review => {
@@ -277,7 +279,9 @@ class ReviewController extends BaseController {
    */
   deleteReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
-      .then(role => {
+      .then(payload => {
+        if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
         return Review.getById(req.body._id);
       })
       .then(review => {
@@ -347,43 +351,43 @@ class ReviewController extends BaseController {
   voteReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
-        req.role = payload;
+        if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
+        req.role = payload.role;
         return Review.getById(req.params.id);
       })
       .then(review => {
         if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
-
-        if (review.userId.toString() === req.body.uid) {
-          throw new APIError("Forbidden", httpStatus.FORBIDDEN)
-        }
+        if (review.userId.toString() === req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         req.bid = review.businessId;
         let upIndex;
-        let permission = this._ac.can(req.role).updateAny('review');
 
-        if (req.body.vote === 'upVote') {
-          upIndex = review.upVote.indexOf(req.body.uid);
+        if (req.body.vote === 'upvote') {
+          upIndex = review.upvote.indexOf(req.body.uid);
 
           if (upIndex > -1) {
-            review.upVote.splice(upIndex, 1);
+            review.upvote.splice(upIndex, 1);
 
-            return new Promise((resolve, reject) => {
-              this._notificationGrpcClient.addNotification({
-                userId: review.userId.toString(),
-                senderId: req.body.uid,
-                type: "REVIEW",
-                event: "CANCEL_UPVOTE",
-                subjectUrl: req.body.businessSlug,
-                subjectTitle: req.body.businessName,
-                commentId: review._id.toString(),
-              }, (err, response) => {
-                if (err) reject(err);
+            // return new Promise((resolve, reject) => {
+            //   this._notificationGrpcClient.addNotification({
+            //     userId: review.userId.toString(),
+            //     senderId: req.body.uid,
+            //     type: "REVIEW",
+            //     event: "CANCEL_UPVOTE",
+            //     subjectUrl: req.body.businessSlug,
+            //     subjectTitle: req.body.businessName,
+            //     commentId: review._id.toString(),
+            //   }, (err, response) => {
+            //     if (err) reject(err);
+            //
+            //     resolve(review);
+            //   });
+            // });
 
-                resolve(review);
-              });
-            });
+            return review;
           } else {
-            review.upVote.push(req.body.uid);
+            review.upvote.push(req.body.uid);
 
             return new Promise((resolve, reject) => {
               this._notificationGrpcClient.addNotification({
@@ -394,6 +398,7 @@ class ReviewController extends BaseController {
                 subjectUrl: req.body.businessSlug,
                 subjectTitle: req.body.businessName,
                 commentId: review._id.toString(),
+                commentContent: review.content,
               }, (err, response) => {
                 if (err) reject(err);
 
@@ -408,7 +413,7 @@ class ReviewController extends BaseController {
       })
       .then(review => {
         return res.json({
-          review: review
+          review,
         });
       })
       .catch(err => {
@@ -428,7 +433,7 @@ class ReviewController extends BaseController {
         if (!payload.isVerified && payload.uid !== req.body.uid) {
           reject(new APIError("Forbidden", httpStatus.FORBIDDEN));
         } else {
-          return resolve(payload.role);
+          return resolve(payload);
         }
  			})(req, res, next);
  		});

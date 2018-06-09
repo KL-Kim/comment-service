@@ -57,7 +57,7 @@ const ReviewSchema = new Schema({
   "comeback": {
     type: Boolean,
   },
-  "upVote": [{
+  "upvote": [{
     type: Schema.Types.ObjectId,
     ref: 'User'
   }],
@@ -127,7 +127,7 @@ ReviewSchema.statics = {
 
       case "useful":
         order = {
-          "upVote": -1,
+          "upvote": -1,
         };
         break;
 

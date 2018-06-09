@@ -1,15 +1,33 @@
 import Promise from 'bluebird';
+import grpc from 'grpc';
 import httpStatus from 'http-status';
 import passport from 'passport';
 import _ from 'lodash';
+import { AccessControl } from 'accesscontrol';
 
+import config from '../config/config';
 import BaseController from './base.controller';
 import APIError from '../helper/api-error';
 import Comment from '../models/comment.model';
+import { businessProto, notificationProto } from '../config/grpc.client';
+import grants from '../config/rbac.config';
 
 class CommentController extends BaseController {
   constructor() {
     super();
+
+    this._ac = new AccessControl(grants);
+
+    this._notificationGrpcClient = new notificationProto.NotificationService(
+      config.notificationGrpcServer.host + ':' + config.notificationGrpcServer.port,
+      grpc.credentials.createInsecure()
+    );
+
+    this._notificationGrpcClient.waitForReady(Infinity, (err) => {
+      if (err) console.error(err);
+
+      console.log("Comment controller connect Notification gRPC Server succesfully!");
+    });
   }
 
   /**
@@ -23,19 +41,40 @@ class CommentController extends BaseController {
    * @property {ObjectId} req.query.parentId - Comment parent id
    */
   getCommentsList(req, res, next) {
-    const { skip, limit, seach, uid, pid, status, parentId } = req.query;
+    const { skip, limit, search, uid, pid, status, parentId, orderBy } = req.query;
 
-    Comment.getCount()
+    Comment.getCount({
+        filter: {
+          postId: pid,
+          userId: uid,
+          status,
+          parentId,
+        },
+        search,
+        orderBy,
+      })
       .then(count => {
         req.count = count;
 
-        return Comment.getList();
+        return Comment.getList({
+          filter: {
+            postId: pid,
+            userId: uid,
+            status,
+            parentId,
+          },
+          search,
+          orderBy,
+        });
       })
       .then(list => {
         return res.json({
           totalCount: req.count,
           list: list,
         });
+      })
+      .catch(err => {
+        return next(err);
       });
   }
 
@@ -53,17 +92,37 @@ class CommentController extends BaseController {
       .then(payload => {
         if (req.body.uid !== payload.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
-        const { pid, uid, content, parentId, replyToComment, replyToUser } = req.body;
+        const { pid, uid, content, parentId, replyToUser } = req.body;
 
         const comment = new Comment({
           userId: uid,
           postId: pid,
           content: content,
           parentId: parentId,
-          replyToComment: replyToComment,
           replyToUser: replyToUser,
         });
 
+        if (replyToUser) {
+          return new Promise((resolve, reject) => {
+            this._notificationGrpcClient.addNotification({
+              type: "COMMENT",
+              event: "REPLY",
+              userId: replyToUser,
+              senderId: uid,
+              subjectUrl: pid,
+              commentContent: content,
+              commentId: parentId,
+            }, (err, response) => {
+              if (err) reject(err);
+
+              resolve(comment);
+            });
+          });
+        }
+
+        return comment;
+      })
+      .then(comment => {
         return comment.save();
       })
       .then(comment => {
@@ -98,6 +157,135 @@ class CommentController extends BaseController {
       .catch(err => {
         return next(err);
       });
+  }
+
+  /**
+   * Vote comment
+   * @property {ObjectId} req.body.uid - User id
+   * @property {String} req.body.vote - Upvote or downvote
+   * @property {String} req.body.postTitle - Post title
+   */
+  voteComment(req, res, next) {
+    CommentController.authenticate(req, res, next)
+      .then(payload => {
+        if (req.body.uid !== payload.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
+        req.role = payload.role;
+        return Comment.findById(req.params.id);
+      })
+      .then(comment => {
+        if (_.isEmpty(comment)) throw new APIError("Not found", httpStatus.NOT_FOUND);
+        if (comment.userId.toString() === req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
+        const upIndex = comment.upvote.indexOf(req.body.uid);
+        const downIndex = comment.downvote.indexOf(req.body.uid);
+
+        if (req.body.vote === 'UPVOTE') {
+          if (upIndex > -1) {
+            comment.upvote.splice(upIndex, 1);
+
+            // return new Promise((resolve, reject) => {
+            //   this._notificationGrpcClient.addNotification({
+            //     userId: comment.userId.toString(),
+            //     senderId: req.body.uid,
+            //     type: "COMMENT",
+            //     event: "CANCEL_UPVOTE",
+            //     subjectUrl: comment.postId.toString(),
+            //     subjectTitle: req.body.postTitle,
+            //     commentContent: comment.content,
+            //     commentId: comment._id.toString(),
+            //   }, (err, response) => {
+            //     if (err) reject(err);
+            //
+            //     resolve(comment);
+            //   });
+            // });
+
+            return comment;
+          } else {
+            if (downIndex > -1) {
+              comment.downvote.splice(downIndex, 1);
+            }
+
+            comment.upvote.push(req.body.uid);
+
+            return new Promise((resolve, reject) => {
+              this._notificationGrpcClient.addNotification({
+                userId: comment.userId.toString(),
+                senderId: req.body.uid,
+                type: "COMMENT",
+                event: "UPVOTE",
+                subjectUrl: comment.postId.toString(),
+                subjectTitle: req.body.postTitle,
+                commentContent: comment.content,
+                commentId: comment._id.toString(),
+              }, (err, response) => {
+                if (err) reject(err);
+
+                resolve(comment);
+              });
+            });
+          }
+        } else if (req.body.vote === 'DOWNVOTE') {
+          if (downIndex > -1) {
+            comment.downvote.splice(upIndex, 1);
+
+            // return new Promise((resolve, reject) => {
+            //   this._notificationGrpcClient.addNotification({
+            //     userId: comment.userId.toString(),
+            //     senderId: req.body.uid,
+            //     type: "COMMENT",
+            //     event: "CANCEL_DOWNVOTE",
+            //     subjectUrl: comment.postId.toString(),
+            //     subjectTitle: req.body.postTitle,
+            //     commentContent: comment.content,
+            //     commentId: comment._id.toString(),
+            //   }, (err, response) => {
+            //     if (err) reject(err);
+            //
+            //     resolve(comment);
+            //   });
+            // });
+
+            return comment;
+          } else {
+            if (upIndex > -1) {
+              comment.upvote.splice(upIndex, 1);
+            }
+
+            comment.downvote.push(req.body.uid);
+
+            return new Promise((resolve, reject) => {
+              this._notificationGrpcClient.addNotification({
+                userId: comment.userId.toString(),
+                senderId: req.body.uid,
+                type: "COMMENT",
+                event: "DOWNVOTE",
+                subjectUrl: comment.postId.toString(),
+                subjectTitle: req.body.postTitle,
+                commentContent: comment.content,
+                commentId: comment._id.toString(),
+              }, (err, response) => {
+                if (err) reject(err);
+
+                resolve(comment);
+              });
+            });
+          }
+
+        }
+      })
+      .then(comment => {
+        return comment.save();
+      })
+      .then(comment => {
+        return res.json({
+          comment
+        });
+      })
+      .catch(err => {
+        return next(err);
+      })
   }
 
   /**
