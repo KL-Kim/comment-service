@@ -108,7 +108,7 @@ CommentSchema.statics = {
 
       default:
         sort = {
-          "upVote": -1,
+          "upvote": -1,
           "createdAt": -1
         }
     }
@@ -125,7 +125,9 @@ CommentSchema.statics = {
       };
     }
 
-    if (filter.status) {
+    if (filter.status === 'ALL') {
+      statusCondition = {};
+    } else if (filter.status) {
       statusCondition = {
         "status": filter.status
       };
@@ -168,6 +170,15 @@ CommentSchema.statics = {
         path: 'postId',
         select: ['title', 'status'],
         model: Post,
+      })
+      .populate({
+        path: 'parentId',
+        select: ['content', 'status'],
+      })
+      .populate({
+        path: 'replyToUser',
+        select: ['username', 'firstName', 'lastName'],
+        model: User,
       })
 			.exec();
 	},

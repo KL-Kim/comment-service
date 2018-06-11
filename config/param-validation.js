@@ -83,7 +83,7 @@ export default {
 			search: Joi.string().trim().strip().allow(''),
       uid: Joi.string().hex(),
       pid: Joi.string().hex(),
-      status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
+      status: Joi.string().valid(['NORMAL', 'SUSPENDED', 'ALL']),
       parentId: Joi.string().hex(),
     },
   },
