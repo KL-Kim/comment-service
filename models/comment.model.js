@@ -199,7 +199,9 @@ CommentSchema.statics = {
       };
     }
 
-    if (filter.status) {
+    if (filter.status === 'ALL') {
+      statusCondition = {};
+    } else if (filter.status) {
       statusCondition = {
         "status": filter.status
       };
