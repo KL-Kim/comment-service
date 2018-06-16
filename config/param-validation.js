@@ -8,7 +8,7 @@ import Joi from 'joi';
 export default {
 
   // Get reviews
-  "getReviews": {
+  "getReviewsList": {
     "query": {
       bid: Joi.string().hex(),
       uid: Joi.string().hex(),
@@ -49,8 +49,6 @@ export default {
       serviceGood: Joi.boolean(),
       envGood: Joi.boolean(),
       comeback: Joi.boolean(),
-      status: Joi.string().valid('normal', 'suspended'),
-      quality: Joi.number(),
     }
   },
 
@@ -72,6 +70,17 @@ export default {
       vote: Joi.string().valid(['upvote', 'downvote']),
       businessName: Joi.string().trim(),
       businessSlug: Joi.string().trim(),
+    }
+  },
+
+  // Update review
+  "editReviewByAdmin": {
+    "params": {
+      id: Joi.string().hex().required(),
+    },
+    "body": {
+      status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
+      quality: Joi.number(),
     }
   },
 
@@ -109,16 +118,6 @@ export default {
     }
   },
 
-  /** PUT /api/v1/admin/comment/:id - Update comment by admin **/
-  "updateCommentByAdmin": {
-    "params": {
-      id: Joi.string().hex().required(),
-    },
-    "body": {
-      status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
-    }
-  },
-
   // Vote comment
   "voteComment": {
     "params": {
@@ -128,6 +127,16 @@ export default {
       uid: Joi.string().hex().required(),
       vote: Joi.string().valid(['UPVOTE', 'DOWNVOTE']),
       postTitle: Joi.string().trim(),
+    }
+  },
+
+  /** PUT /api/v1/admin/comment/:id - Update comment by admin **/
+  "editCommentByAdmin": {
+    "params": {
+      id: Joi.string().hex().required(),
+    },
+    "body": {
+      status: Joi.string().valid(['NORMAL', 'SUSPENDED']),
     }
   },
 };

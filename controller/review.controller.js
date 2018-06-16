@@ -1,3 +1,13 @@
+/**
+ * Review controller
+ *
+ * @export {Class}
+ * @version 0.0.1
+ *
+ * @author KL-Kim (https://github.com/KL-Kim)
+ * @license MIT
+ */
+
 import Promise from 'bluebird';
 import httpStatus from 'http-status';
 import passport from 'passport';
@@ -19,25 +29,33 @@ class ReviewController extends BaseController {
     super();
 
     this._ac = new AccessControl(grants);
+    
+    // this._businessGrpcClient = new businessProto.BusinessService(
+    //   config.businessGrpcServer.host + ':' + config.businessGrpcServer.port,
+    //   grpc.credentials.createSsl(
+    //     config.rootCert,
+    //     config.grpcPrivateKey,
+    //     config.grpcPublicKey,
+    //   ),
+    //   {
+    //     'grpc.ssl_target_name_override' : 'ikoreatown.net',
+    //     'grpc.default_authority': 'ikoreatown.net'
+    //   }
+    // );
+
+    // Connect to business service grpc server
     this._businessGrpcClient = new businessProto.BusinessService(
       config.businessGrpcServer.host + ':' + config.businessGrpcServer.port,
-      grpc.credentials.createSsl(
-        config.rootCert,
-        config.grpcPrivateKey,
-        config.grpcPublicKey,
-      ),
-      {
-        'grpc.ssl_target_name_override' : 'ikoreatown.net',
-        'grpc.default_authority': 'ikoreatown.net'
-      }
+      grpc.credentials.createInsecure()
     );
 
     this._businessGrpcClient.waitForReady(Infinity, (err) => {
       if (err) console.error(err);
 
-      console.log("Review controller connect Business gRPC Server succesfully!");
+      console.log("Review controller connected Business gRPC Server succesfully!");
     });
 
+    // Connect to notification service grpc server
     this._notificationGrpcClient = new notificationProto.NotificationService(
       config.notificationGrpcServer.host + ':' + config.notificationGrpcServer.port,
       grpc.credentials.createInsecure()
@@ -46,23 +64,25 @@ class ReviewController extends BaseController {
     this._notificationGrpcClient.waitForReady(Infinity, (err) => {
       if (err) console.error(err);
 
-      console.log("Review controller connect Notification gRPC Server succesfully!");
+      console.log("Review controller connected Notification gRPC Server succesfully!");
     });
   }
 
   /**
    * Get reviews list
-   * @property {ObjectId} req.query.bid - business id
-   * @property {ObjectId} req.query.uid - user id
+   * @role - *
+   * @since 0.0.1
+   * @property {ObjectId} req.query.bid - Business id
+   * @property {ObjectId} req.query.uid - User id
    * @property {Number} req.query.skip - Number of reviews to skip
    * @property {Number} req.query.limit - Number of reviews page limit
    * @property {String} req.query.orderBy - Get list order by new, useful, recommended
    * @property {String} req.query.search - Search term
    */
-  getReviews(req, res, next) {
+  getReviewsList(req, res, next) {
     const { skip, limit, search, bid, uid, orderBy } = req.query;
 
-    Review.getCount({search, filter: { bid, uid }})
+    Review.getCount({ search, filter: { bid, uid } })
       .then(totalCount => {
         req.totalCount = totalCount;
 
@@ -81,6 +101,8 @@ class ReviewController extends BaseController {
 
   /**
    * Get single review
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.params.id - Review id
    */
   getSingleReview(req, res, next) {
@@ -97,6 +119,8 @@ class ReviewController extends BaseController {
 
   /**
    * Add new review
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.body.businessId - Business id
    * @property {ObjectId} req.body.uid - User id
    * @property {String} req.body.content  - Review content
@@ -107,9 +131,9 @@ class ReviewController extends BaseController {
    * @property {Object} req.files - Review images
    */
   addNewReview(req, res, next) {
-    ReviewController.authenticate(req, res, next).
-      then(payload => {
-        if (payload.uid !== req.boby.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+    ReviewController.authenticate(req, res, next)
+      .then(payload => {
+        if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         const review = new Review({
           userId: req.body.uid,
@@ -167,50 +191,33 @@ class ReviewController extends BaseController {
 
   /**
    * Update review
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.body._id - Review id
    * @property {ObjectId} req.body.uid - User id
    * @property {String} req.body.content  - Review content
    * @property {Number} req.body.rating - Review rating
+   * @property {Number} req.body.serviceGood - Review rating
+   * @property {Number} req.body.envGood - Review rating
+   * @property {Number} req.body.comeback - Review rating
    * @property {Object} req.files - Review images
-   * @property {String} req.body.status - Only manager, admin and god can update review status
-   * @property {Number} req.body.quality - Only manager, admin and god can update review quality
    */
   updateReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
-        if (payload.uid !== req.boby.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+        if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
-        req.role = payload.role;
-        return Review.getById(req.body._id);
+        return Review.findById(req.body._id);
       })
       .then(review => {
         if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
 
-        let permission, difference;
-        req.bid = review.businessId;
+        let difference;
 
-        if (review.userId.toString() === req.body.uid) {
-          permission = this._ac.can(req.role).updateOwn('review');
-          req.isOwn = true;
-        } else {
-          permission = this._ac.can(req.role).updateAny('review');
-          req.isOwn = false;
-        }
+        if (req.body.rating) difference = req.body.rating - review.rating;
 
-        const data = permission.filter(req.body);
-
-        if (_.isEmpty(data)) return review;
-
-        _.map(data, (value, key) => {
-          if (key === 'rating') {
-            difference = data.rating - review.rating;
-          }
-
-          review[key] = value;
-        });
-
-
-        if (!_.isUndefined(difference) && difference !== 0) {
+        // Recalculate business's average rating
+        if (difference && difference !== 0) {
           return new Promise((resolve, reject) => {
             const data = {
               rid: review._id.toString(),
@@ -238,28 +245,12 @@ class ReviewController extends BaseController {
         return review.save();
       })
       .then(review => {
-        let filter = {};
-
-        if (req.isOwn) {
-          filter = {
-            uid: req.body.uid
-          }
-        }
-
-        return Review.getCount({ filter: filter });
+        return Review.getCount({ filter: { uid: req.body.uid } });
       })
       .then(count => {
         req.totalCount = count;
 
-        let filter = {};
-
-        if (req.isOwn) {
-          filter = {
-            uid: req.body.uid
-          }
-        }
-
-        return Review.getList({ filter: filter, orderBy: 'new' });
+        return Review.getList({ filter: { uid: req.body.uid }, orderBy: 'new' });
       })
       .then(list => {
         return res.json({
@@ -274,6 +265,8 @@ class ReviewController extends BaseController {
 
   /**
    * Delete review
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.body._id - Review id
    * @property {ObjectId} req.body.uid - User's id
    */
@@ -282,7 +275,7 @@ class ReviewController extends BaseController {
       .then(payload => {
         if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
-        return Review.getById(req.body._id);
+        return Review.findById(req.body._id);
       })
       .then(review => {
         if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
@@ -342,6 +335,8 @@ class ReviewController extends BaseController {
 
   /**
    * Vote review
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.params.id - Review id
    * @property {String} req.body.vote - Vote review
    * @property {ObjectId} req.body.uid - User id
@@ -360,7 +355,6 @@ class ReviewController extends BaseController {
         if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
         if (review.userId.toString() === req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
-        req.bid = review.businessId;
         let upIndex;
 
         if (req.body.vote === 'upvote') {
@@ -422,7 +416,40 @@ class ReviewController extends BaseController {
   }
 
   /**
+   * Edit review by admin
+   * @role - manager, admin, god
+   * @since 0.0.1
+   * @property {ObjectId} req.params.id - Review Id
+   * @property {String} req.body.status - Review status
+   * @property {Number} req.body.quality - Only manager, admin and god can update review quality
+   * @returns {void}
+   */
+  editReviewByAdmin(req, res, next) {
+    ReviewController.authenticate(req, res, next)
+      .then(payload => {
+        if (payload.role !== 'manager' && payload.role !== 'admin' && payload.role !== 'god') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
+        return Review.findById(req.params.id);
+      })
+      .then(review => {
+        if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
+
+        const { status, quality } = req.body;
+
+        return review.update({...req.body});
+      })
+      .then(review => {
+        return res.status(204).send();
+      })
+      .catch(err => {
+        return next(err);
+      });
+  }
+
+  /**
    * Authenticate
+   * @since 0.0.1
+   * @returns {Promise<Object, APIError>}
    */
   static authenticate(req, res, next) {
  		return new Promise((resolve, reject) => {
@@ -430,11 +457,7 @@ class ReviewController extends BaseController {
  				if (err) return reject(err);
  				if (info) return reject(new APIError(info.message, httpStatus.UNAUTHORIZED));
 
-        if (!payload.isVerified && payload.uid !== req.body.uid) {
-          reject(new APIError("Forbidden", httpStatus.FORBIDDEN));
-        } else {
-          return resolve(payload);
-        }
+        return resolve(payload);
  			})(req, res, next);
  		});
  	}

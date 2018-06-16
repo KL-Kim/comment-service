@@ -25,8 +25,10 @@ const accessTokenOptions = {
 };
 
 passport.use('access-token', new JwtStrategy(accessTokenOptions, (payload, done) => {
-	if (payload.uid && payload.role) return done(null, payload, false);
-	else return done(new APIError("Unauthorized", httpStatus.UNAUTHORIZED))
+	if (payload.uid && payload.role && payload.isVerified) 
+		return done(null, payload, false);
+	else
+		return done(new APIError("Unauthorized", httpStatus.UNAUTHORIZED))
 }));
 
 export default passport;

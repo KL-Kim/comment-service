@@ -7,6 +7,14 @@ import CommentController from '../../controller/comment.controller';
 const router = Express.Router();
 const commentController = new CommentController();
 
+validate.options({
+  allowUnknownBody: false,
+  allowUnknownHeaders: true,
+  allowUnknownQuery: true,
+  allowUnknownParams: false,
+  allowUnknownCookies: true
+});
+
 /** GET /api/v1/comment - Get list of comments **/
 router.get('/', validate(paramValidation.getCommentsList), commentController.getCommentsList);
 
@@ -19,7 +27,7 @@ router.delete('/:id', validate(paramValidation.deleteComment), commentController
 /** POST /api/v1/comment/vote/:id - Vote comment **/
 router.post('/vote/:id', validate(paramValidation.voteComment), commentController.voteComment);
 
-/** PUT /api/v1/admin/comment/:id - Update comment by admin **/
-router.put('/admin/:id', validate(paramValidation.updateCommentByAdmin), commentController.updateCommentByAdmin);
+/** POST /api/v1/admin/comment/:id - Update comment by admin **/
+router.post('/admin/:id', validate(paramValidation.editCommentByAdmin), commentController.editCommentByAdmin);
 
 export default router;

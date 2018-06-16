@@ -13,12 +13,12 @@ validate.options({
   allowUnknownBody: false,
   allowUnknownHeaders: true,
   allowUnknownQuery: true,
-  allowUnknownParams: true,
+  allowUnknownParams: false,
   allowUnknownCookies: true
 });
 
 /** GET /api/v1/review - Get list of reviews **/
-router.get('/', validate(paramValidation.getReviews), reviewController.getReviews);
+router.get('/', validate(paramValidation.getReviewsList), reviewController.getReviewsList);
 
 /** GET /api/v1/review/single/:id - Get single review **/
 router.get('/single/:id', validate(paramValidation.getSingleReview), reviewController.getSingleReview);
@@ -34,5 +34,8 @@ router.delete('/', validate(paramValidation.deleteReview), reviewController.dele
 
 /** POST /api/v1/review - Update review **/
 router.post('/vote/:id', validate(paramValidation.voteReview), reviewController.voteReview);
+
+/** POST /api/v1/admin/comment/:id - Update comment by admin **/
+router.post('/admin/:id', validate(paramValidation.editReviewByAdmin), reviewController.editReviewByAdmin);
 
 export default router;

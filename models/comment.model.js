@@ -1,3 +1,12 @@
+/**
+ * Comment Model
+ *
+ * @version 0.0.1
+ *
+ * @author KL-Kim (https://github.com/KL-Kim)
+ * @license MIT
+ */
+
 import Promise from 'bluebird';
 import mongoose, { Schema } from 'mongoose';
 import httpStatus from 'http-status';
@@ -27,6 +36,7 @@ const CommentSchema = new Schema({
     type: Schema.Types.ObjectId,
     'ref': 'Post',
     required: true,
+    index: true,
   },
   "parentId": {
     type: Schema.Types.ObjectId,
@@ -39,6 +49,7 @@ const CommentSchema = new Schema({
   "content": {
     type: String,
     required: true,
+    'text': true
   },
   "upvote": [{
     type: Schema.Types.ObjectId,
@@ -50,7 +61,8 @@ const CommentSchema = new Schema({
   }],
   "createdAt": {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true,
   },
 });
 
@@ -58,8 +70,8 @@ const CommentSchema = new Schema({
  * Index
  */
 CommentSchema.index({
-  "postId": 1,
-  "content": "text",
+  "upvote": -1,
+  "createdAt": -1
 });
 
 /**

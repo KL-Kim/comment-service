@@ -1,3 +1,13 @@
+/**
+ * Comment controller
+ *
+ * @export {Class}
+ * @version 0.0.1
+ *
+ * @author KL-Kim (https://github.com/KL-Kim)
+ * @license MIT
+ */
+
 import Promise from 'bluebird';
 import grpc from 'grpc';
 import httpStatus from 'http-status';
@@ -18,6 +28,7 @@ class CommentController extends BaseController {
 
     this._ac = new AccessControl(grants);
 
+    // Connect to Notification Service grpc server
     this._notificationGrpcClient = new notificationProto.NotificationService(
       config.notificationGrpcServer.host + ':' + config.notificationGrpcServer.port,
       grpc.credentials.createInsecure()
@@ -32,6 +43,8 @@ class CommentController extends BaseController {
 
   /**
    * Get reviews list
+   * @role - *
+   * @since 0.0.1
    * @property {Number} req.query.skip - Number of list to skip
    * @property {Number} req.query.limit - Number of list to limit
    * @property {String} req.query.search - Search term
@@ -39,6 +52,7 @@ class CommentController extends BaseController {
    * @property {ObjectId} req.query.pid - Post id
    * @property {String} req.query.status - Comment status
    * @property {ObjectId} req.query.parentId - Comment parent id
+   * @returns {Comment[]}
    */
   getCommentsList(req, res, next) {
     const { skip, limit, search, uid, pid, status, parentId, orderBy } = req.query;
@@ -80,12 +94,15 @@ class CommentController extends BaseController {
 
   /**
    * Add new comment
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.body.uid  - User id
    * @property {OBjectId} req.body.pid - Post id
    * @property {String} req.body.content - Comment content
    * @property {ObjectId} req.body.parentId - Comment parent id
    * @property {ObjectId} req.body.replyToComment - Reply comment id
    * @property {ObjectId} req.body.replyToUser - Reply comment to User
+   * @returns {void}
    */
   addNewComment(req, res, next) {
     CommentController.authenticate(req, res, next)
@@ -135,8 +152,11 @@ class CommentController extends BaseController {
 
   /**
    * Delete comment
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.params.id - Comment Id
    * @property {ObjectId} req.body.uid - User id
+   * @returns {void}
    */
   deleteComment(req, res, next) {
     CommentController.authenticate(req, res, next)
@@ -161,9 +181,12 @@ class CommentController extends BaseController {
 
   /**
    * Vote comment
+   * @role - *
+   * @since 0.0.1
    * @property {ObjectId} req.body.uid - User id
    * @property {String} req.body.vote - Upvote or downvote
    * @property {String} req.body.postTitle - Post title
+   * @returns {void}
    */
   voteComment(req, res, next) {
     CommentController.authenticate(req, res, next)
@@ -289,11 +312,14 @@ class CommentController extends BaseController {
   }
 
   /**
-   * Update comment by admin
+   * Update comment status by admin
+   * @role - manager, admin, god
+   * @since 0.0.1
    * @property {ObjectId} req.params.id - Comment Id
    * @property {String} req.body.status - Comment status
+   * @returns {void}
    */
-  updateCommentByAdmin(req, res, next) {
+  editCommentByAdmin(req, res, next) {
     CommentController.authenticate(req, res, next)
       .then(payload => {
         if (payload.role !== 'manager' && payload.role !== 'admin' && payload.role !== 'god') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
@@ -317,6 +343,8 @@ class CommentController extends BaseController {
 
   /**
    * Authenticate
+   * @since 0.0.1
+	 * @returns {Promise<Object, APIError>}
    */
   static authenticate(req, res, next) {
  		return new Promise((resolve, reject) => {

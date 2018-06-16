@@ -1,3 +1,12 @@
+/**
+ * Review Model
+ *
+ * @version 0.0.1
+ *
+ * @author KL-Kim (https://github.com/KL-Kim)
+ * @license MIT
+ */
+
 import Promise from 'bluebird';
 import mongoose, { Schema } from 'mongoose';
 import httpStatus from 'http-status';
@@ -5,6 +14,7 @@ import _ from 'lodash';
 
 import config from '../config/config';
 import APIError from '../helper/api-error';
+
 const businessDB = mongoose.createConnection(config.businessMongo.host + ':' + config.businessMongo.port + '/' + config.businessMongo.name);
 const userDB = mongoose.createConnection(config.userMongo.host + ':' + config.userMongo.port + '/' + config.userMongo.name);
 
@@ -15,8 +25,8 @@ const ReviewSchema = new Schema({
   "status": {
     type: String,
     required: true,
-    default: 'normal',
-    enum: ['normal', 'suspended']
+    default: 'NORMAL',
+    enum: ['NORMAL', 'SUSPENDED']
   },
   "quality": {
     type: Number,
@@ -24,14 +34,18 @@ const ReviewSchema = new Schema({
     default: 0,
     min: 0,
     max: 9,
+    index: true,
   },
   "businessId": {
     type: Schema.Types.ObjectId,
     required: true,
-    ref: 'Business'
+    ref: 'Business',
+    index: true,
   },
   "business": {
     type: Schema.Types.ObjectId,
+    required: true,
+    ref: 'Business'
   },
   "userId": {
     type: Schema.Types.ObjectId,
@@ -40,6 +54,9 @@ const ReviewSchema = new Schema({
   },
   "user": {
     type: Schema.Types.ObjectId,
+    required: true,
+    ref: 'User',
+    index: true,
   },
   "rating": {
     type: Number,
@@ -47,6 +64,7 @@ const ReviewSchema = new Schema({
   },
   "content": {
     type: String,
+    text: true
   },
   "serviceGood": {
     type: Boolean,
@@ -66,18 +84,23 @@ const ReviewSchema = new Schema({
   }],
   "createdAt": {
 		type: Date,
-		default: Date.now
+		default: Date.now,
+    index: true,
 	},
 });
 
 /**
- * Index
+ * Compound Indexes
  */
 ReviewSchema.index({
-  "quality": 1,
-  "businessId": 1,
-  "userId": 1,
-  "content": "text",
+  "quality": -1,
+  "upvote": -1,
+  "createdAt": -1,
+});
+
+ReviewSchema.index({
+  "upvote": -1,
+  "createdAt": -1,
 });
 
 /**
@@ -128,12 +151,14 @@ ReviewSchema.statics = {
       case "useful":
         order = {
           "upvote": -1,
+          "createdAt": -1,
         };
         break;
 
       default:
         order = {
-          "quality": 'desc',
+          "quality": -1,
+          "upvote": -1,
           "createdAt": -1
         };
     }
@@ -245,6 +270,11 @@ ReviewSchema.statics = {
         path: 'business',
         select: ['krName', 'cnName', 'enName', 'status'],
         model: Business,
+      })
+      .populate({
+        path: 'user',
+        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        model: User,
       })
       .exec();
   },
