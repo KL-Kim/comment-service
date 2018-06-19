@@ -35,7 +35,10 @@ router.delete('/', validate(paramValidation.deleteReview), reviewController.dele
 /** POST /api/v1/review - Update review **/
 router.post('/vote/:id', validate(paramValidation.voteReview), reviewController.voteReview);
 
-/** POST /api/v1/admin/comment/:id - Update comment by admin **/
+/** GET /api/v1/review/admin - Get reviews list by admin **/
+router.get('/admin', validate(paramValidation.getReviewsListByAdmin), reviewController.getReviewsListByAdmin);
+
+/** POST /api/v1/review/admin/:id - Edit review by admin **/
 router.post('/admin/:id', validate(paramValidation.editReviewByAdmin), reviewController.editReviewByAdmin);
 
 export default router;

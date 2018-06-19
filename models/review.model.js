@@ -137,9 +137,9 @@ ReviewSchema.statics = {
    * @property {ObjectId} filter.uid - User id
 	 * @returns {Promise<Review[]>}
 	 */
-	getList({ skip = 0, limit = 10, search, filter = {}, orderBy } = {}) {
+	getList({ skip = 0, limit = 10, search, filter, orderBy } = {}) {
     let order;
-    let conditions, businessCondition, userCondition, searchCondition;
+    let conditions, businessCondition, userCondition, searchCondition, statusCondition;
 
     switch (orderBy) {
       case "new":
@@ -175,6 +175,12 @@ ReviewSchema.statics = {
       };
     }
 
+    if (filter.status) {
+      statusCondition = {
+        "status": filter.status,
+      };
+    }
+
     const escapedString = _.escapeRegExp(search);
 
     if (escapedString) {
@@ -186,12 +192,13 @@ ReviewSchema.statics = {
       }
     }
 
-    if (businessCondition || userCondition || searchCondition) {
+    if (businessCondition || userCondition || searchCondition || statusCondition) {
       conditions = {
         "$and": [
+          _.isEmpty(statusCondition) ? {} : statusCondition,
           _.isEmpty(searchCondition) ? {} : searchCondition,
 					_.isEmpty(businessCondition) ? {} : businessCondition,
-          _.isEmpty(userCondition) ? {} : userCondition
+          _.isEmpty(userCondition) ? {} : userCondition,
         ]
       }
     }
@@ -221,7 +228,7 @@ ReviewSchema.statics = {
 	 * @returns {Promise<Review[]>}
 	 */
   getCount({ search, filter = {} } = {}) {
-    let conditions, businessCondition, userCondition, searchCondition;
+    let conditions, businessCondition, userCondition, searchCondition, statusCondition;
 
     const escapedString = _.escapeRegExp(search);
 
@@ -246,9 +253,16 @@ ReviewSchema.statics = {
       };
     }
 
-    if (businessCondition || userCondition || searchCondition) {
+    if (filter.status) {
+      statusCondition = {
+        "status": filter.status,
+      };
+    }
+
+    if (businessCondition || userCondition || searchCondition || statusCondition) {
       conditions = {
         "$and": [
+          _.isEmpty(statusCondition) ? {} : statusCondition,
           _.isEmpty(searchCondition) ? {} : searchCondition,
 					_.isEmpty(businessCondition) ? {} : businessCondition,
           _.isEmpty(userCondition) ? {} : userCondition

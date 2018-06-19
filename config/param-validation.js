@@ -73,6 +73,19 @@ export default {
     }
   },
 
+  // Get reviews list by admin
+  "getReviewsListByAdmin": {
+    "query": {
+      bid: Joi.string().hex(),
+      uid: Joi.string().hex(),
+			limit: Joi.number(),
+			skip: Joi.number(),
+			search: Joi.string().trim().strip().allow(''),
+      status: Joi.string().valid(['NORMAL', 'SUSPENDED', '']),
+      orderBy: Joi.string().valid(['new', 'useful', 'recommended', '']),
+    }
+  },
+
   // Update review
   "editReviewByAdmin": {
     "params": {

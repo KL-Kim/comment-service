@@ -29,7 +29,7 @@ class ReviewController extends BaseController {
     super();
 
     this._ac = new AccessControl(grants);
-    
+
     // this._businessGrpcClient = new businessProto.BusinessService(
     //   config.businessGrpcServer.host + ':' + config.businessGrpcServer.port,
     //   grpc.credentials.createSsl(
@@ -82,11 +82,11 @@ class ReviewController extends BaseController {
   getReviewsList(req, res, next) {
     const { skip, limit, search, bid, uid, orderBy } = req.query;
 
-    Review.getCount({ search, filter: { bid, uid } })
+    Review.getCount({ search, filter: { bid, uid, status: "NORMAL" } })
       .then(totalCount => {
         req.totalCount = totalCount;
 
-        return Review.getList({ skip, limit, search, filter: { bid, uid }, orderBy });
+        return Review.getList({ skip, limit, search, filter: { bid, uid, status: "NORMAL" }, orderBy });
       })
       .then(list => {
         return res.json({
@@ -413,6 +413,44 @@ class ReviewController extends BaseController {
       .catch(err => {
         return next(err);
       });
+  }
+
+  /**
+   * Get reviews list by admin
+   * @role - manager, admin, god
+   * @since 0.0.1
+   * @property {Number} req.query.skip - Number of reviews to skip
+   * @property {Number} req.query.limit - Number of reviews page limit
+   * @property {String} req.query.orderBy - Get list order by new, useful, recommended
+   * @property {String} req.query.search - Search term
+   * @property {String} req.query.status - Review status
+   * @property {ObjectId} req.query.bid - Business id
+   * @property {ObjectId} req.query.uid - User id
+   */
+  getReviewsListByAdmin(req, res, next) {
+    const { skip, limit, search, bid, uid, status, orderBy } = req.query;
+
+    ReviewController.authenticate(req, res, next)
+      .then(payload => {
+        if (payload.role !== 'manager' && payload.role !== 'admin' && payload.role !== 'god') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+
+        return Review.getCount({ search, filter: { bid, uid, status } });
+      })
+      .then(totalCount => {
+        req.totalCount = totalCount;
+
+        return Review.getList({ skip, limit, search, filter: { bid, uid, status }, orderBy });
+      })
+      .then(list => {
+        return res.json({
+          list: list,
+          totalCount: req.totalCount,
+        });
+      })
+      .catch(err => {
+        return next(err);
+      });
+
   }
 
   /**
