@@ -71,7 +71,9 @@ class CommentController extends BaseController {
         req.count = count;
 
         return Comment.getList({
-          filter: {
+          skip,
+          limit,
+          filter: {  
             postId: pid,
             userId: uid,
             status,

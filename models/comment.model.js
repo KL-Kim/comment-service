@@ -171,7 +171,9 @@ CommentSchema.statics = {
       }
     }
 
-		return this.find(_.isEmpty(conditions) ? {} : conditions)
+    return this.find(_.isEmpty(conditions) ? {} : conditions)
+      .skip(skip)
+      .limit(limit)
 			.sort(sort)
       .populate({
         path: 'userId',

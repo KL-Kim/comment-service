@@ -173,17 +173,10 @@ class ReviewController extends BaseController {
       })
       .then(response => {
         if (response.businessId)
-          return Review.getCount({ filter: { bid: req.body.bid } });
-      })
-      .then(count => {
-        req.totalCount = count;
-        return Review.getList({ filter: { bid: req.body.bid }, orderBy: 'new' });
-      })
-      .then(list => {
-        return res.json({
-          totalCount: req.totalCount,
-          list: list,
-        });
+          return res.status(204).send();
+        else {
+          throw new APIError("Bad gRPC Response", httpStatus.INTERNAL_SERVER_ERROR);
+        }
       }).catch(err => {
         return next(err);
       });
@@ -245,18 +238,7 @@ class ReviewController extends BaseController {
         return review.save();
       })
       .then(review => {
-        return Review.getCount({ filter: { uid: req.body.uid } });
-      })
-      .then(count => {
-        req.totalCount = count;
-
-        return Review.getList({ filter: { uid: req.body.uid }, orderBy: 'new' });
-      })
-      .then(list => {
-        return res.json({
-          totalCount: req.totalCount,
-          list:list,
-        });
+        return res.status(204).send();
       })
       .catch(err => {
         return next(err);
@@ -307,26 +289,7 @@ class ReviewController extends BaseController {
         return review.remove();
       })
       .then(result => {
-        return Review.getCount({
-          filter: {
-            uid: req.body.uid
-          }
-        });
-      })
-      .then(count => {
-        req.totalCount = count;
-        return Review.getList({
-          "filter": {
-            uid: req.body.uid
-          },
-          "orderBy": 'new'
-        });
-      })
-      .then(list => {
-        return res.json({
-          totalCount: req.totalCount,
-          list:list,
-        });
+        return res.status(204).send();
       })
       .catch(err => {
         return next(err);
