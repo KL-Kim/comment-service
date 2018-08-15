@@ -133,6 +133,7 @@ class ReviewController extends BaseController {
   addNewReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         const review = new Review({
@@ -198,6 +199,7 @@ class ReviewController extends BaseController {
   updateReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         return Review.findById(req.body._id);
@@ -255,6 +257,7 @@ class ReviewController extends BaseController {
   deleteReview(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         return Review.findById(req.body._id);
@@ -395,6 +398,7 @@ class ReviewController extends BaseController {
 
     ReviewController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (payload.role !== 'manager' && payload.role !== 'admin' && payload.role !== 'god') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         return Review.getCount({ search, filter: { bid, uid, status } });
@@ -428,6 +432,7 @@ class ReviewController extends BaseController {
   editReviewByAdmin(req, res, next) {
     ReviewController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (payload.role !== 'manager' && payload.role !== 'admin' && payload.role !== 'god') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         return Review.findById(req.params.id);

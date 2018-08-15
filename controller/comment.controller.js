@@ -109,6 +109,7 @@ class CommentController extends BaseController {
   addNewComment(req, res, next) {
     CommentController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (req.body.uid !== payload.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         const { pid, uid, content, parentId, replyToUser } = req.body;
@@ -163,6 +164,7 @@ class CommentController extends BaseController {
   deleteComment(req, res, next) {
     CommentController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (req.body.uid !== payload.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         return Comment.findById(req.params.id);
@@ -324,6 +326,7 @@ class CommentController extends BaseController {
   editCommentByAdmin(req, res, next) {
     CommentController.authenticate(req, res, next)
       .then(payload => {
+        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
         if (payload.role !== 'manager' && payload.role !== 'admin' && payload.role !== 'god') throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
         return Comment.findById(req.params.id);
@@ -354,11 +357,7 @@ class CommentController extends BaseController {
  				if (err) return reject(err);
  				if (info) return reject(new APIError(info.message, httpStatus.UNAUTHORIZED));
 
-        if (payload.isVerified) {
-      		return resolve(payload);
-      	} else {
-          return reject(new APIError("Unauthorized", httpStatus.UNAUTHORIZED));
-        }
+        return resolve(payload);
  			})(req, res, next);
  		});
  	}
