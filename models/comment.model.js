@@ -177,7 +177,7 @@ CommentSchema.statics = {
 			.sort(sort)
       .populate({
         path: 'userId',
-        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        select: ['username', 'firstName', 'lastName', 'avatarUrl'],
         model: User,
       })
       .populate({
@@ -191,7 +191,7 @@ CommentSchema.statics = {
       })
       .populate({
         path: 'replyToUser',
-        select: ['username', 'firstName', 'lastName'],
+        select: ['username', 'firstName', 'lastName', 'avatarUrl'],
         model: User,
       })
 			.exec();

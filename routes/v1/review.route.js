@@ -1,7 +1,6 @@
 import Express from 'express';
 import validate from 'express-validation';
 import multer from 'multer';
-import mkdirp from 'mkdirp';
 
 import paramValidation from '../../config/param-validation';
 import ReviewController from '../../controller/review.controller';
@@ -17,6 +16,27 @@ validate.options({
   allowUnknownCookies: true
 });
 
+const storage = multer.diskStorage({
+  "destination": 'tmp/images/',
+  "filename": (req, file, cb) => {
+    cb(null, file.originalname);
+  }
+});
+
+const upload = multer({
+  "storage": storage,
+  "fileFilter": (req, file, cb) => {
+    if (file.mimetype === 'image/jpeg'
+      || file.mimetype === 'image/png'
+      || file.mimetype === 'image/gif'
+      || file.mimetype === 'image/webp') {
+        cb(null, true);
+    } else {
+      cb(new Error("Image - Not supported format"));
+    }
+  }
+});
+
 /** GET /api/v1/review - Get list of reviews **/
 router.get('/', validate(paramValidation.getReviewsList), reviewController.getReviewsList);
 
@@ -24,7 +44,9 @@ router.get('/', validate(paramValidation.getReviewsList), reviewController.getRe
 router.get('/single/:id', validate(paramValidation.getSingleReview), reviewController.getSingleReview);
 
 /** POST /api/v1/review - Add new review **/
-router.post('/', validate(paramValidation.addNewReview), reviewController.addNewReview);
+router.post('/', upload.fields([
+  { name: "images", maxCount: 9 }
+]), reviewController.addNewReview);
 
 /** PUT /api/v1/review - Update review **/
 router.put('/', validate(paramValidation.updateReview), reviewController.updateReview);

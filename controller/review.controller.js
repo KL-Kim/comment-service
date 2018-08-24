@@ -11,11 +11,11 @@
 import Promise from 'bluebird';
 import httpStatus from 'http-status';
 import passport from 'passport';
-import fs from 'fs';
-import fsx from 'fs-extra';
 import _ from 'lodash';
 import { AccessControl } from 'accesscontrol';
 import grpc from 'grpc';
+import fs from 'fs';
+import OSS from 'ali-oss';
 
 import { businessProto, notificationProto } from '../config/grpc.client';
 import BaseController from './base.controller';
@@ -147,14 +147,11 @@ class ReviewController extends BaseController {
           envGood: req.body.envGood,
           comeback: req.body.comeback,
         });
-
-        if (req.files) {
-          // Save images files url
-        }
-
         return review.save();
       })
       .then(review => {
+        req.review = review;
+
         return new Promise((resolve, reject) => {
           const data = {
             bid: review.businessId.toString(),
@@ -167,17 +164,80 @@ class ReviewController extends BaseController {
               review.remove();
               return reject(err);
             }
-
             return resolve(response);
           });
         });
       })
       .then(response => {
-        if (response.businessId)
-          return res.status(204).send();
-        else {
+        if (!response.businessId) {
           throw new APIError("Bad gRPC Response", httpStatus.INTERNAL_SERVER_ERROR);
         }
+
+        if (!_.isEmpty(req.files.images)) {
+          const OSS_Client = new OSS({
+            accessKeyId: config.OSSAccessKey.accessKeyId,
+            accessKeySecret: config.OSSAccessKey.accessKeySecret,
+            region: config.OSSRegion,
+            bucket: config.OSSBucket,
+            secure: true,
+          });
+
+          let pathname, promise, promises = [];
+
+          req.files.images.map(image => {
+            const readableStream = fs.createReadStream(image.path);
+
+            readableStream.on("error", error => {
+              throw error;
+            });
+
+            pathname = 'reviews/' + req.body.uid + '/' + req.review._id.toString() + '/' + image.originalname;
+
+            promise = new Promise((resolve, reject) => {
+              return OSS_Client.putStream(pathname, readableStream)
+                      .then(response => {
+                        req.review.images.push({
+                          name: response.name,
+                          url: response.url,
+                        });
+    
+                        return fs.unlink(image.path);
+                      })
+                      .then(() => {
+                        return resolve("Success");
+                      })
+                      .catch(err => {
+                        
+                        const data = {
+                          bid: req.review.businessId.toString(),
+                          rid: req.review._id.toString(),
+                          rating: req.review.rating,
+                        };
+              
+                        this._businessGrpcClient.deleteReview(data, (err, response) => {
+                          if (err) {
+                            return reject(err);
+                          }
+            
+                        });
+
+                        return reject(err);
+                      });
+            });
+
+            promises.push(promise);
+          });
+
+          return Promise.all(promises);
+        } else {
+          return ;
+        }
+      })
+      .then(() => {
+        return req.review.save();
+      })
+      .then(() => {
+        return res.status(204).send();
       }).catch(err => {
         return next(err);
       });
@@ -186,7 +246,6 @@ class ReviewController extends BaseController {
   /**
    * Update review
    * @role - *
-   * @since 0.0.1
    * @property {ObjectId} req.body._id - Review id
    * @property {ObjectId} req.body.uid - User id
    * @property {String} req.body.content  - Review content
@@ -197,54 +256,54 @@ class ReviewController extends BaseController {
    * @property {Object} req.files - Review images
    */
   updateReview(req, res, next) {
-    ReviewController.authenticate(req, res, next)
-      .then(payload => {
-        if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
-        if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
+    // ReviewController.authenticate(req, res, next)
+    //   .then(payload => {
+    //     if (!payload.isVerified) throw new APIError("Unauthorized", httpStatus.UNAUTHORIZED);
+    //     if (payload.uid !== req.body.uid) throw new APIError("Forbidden", httpStatus.FORBIDDEN);
 
-        return Review.findById(req.body._id);
-      })
-      .then(review => {
-        if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
+    //     return Review.findById(req.body._id);
+    //   })
+    //   .then(review => {
+    //     if (_.isEmpty(review)) throw new APIError("Not found", httpStatus.NOT_FOUND);
 
-        let difference;
+    //     let difference;
 
-        if (req.body.rating) difference = req.body.rating - review.rating;
+    //     if (req.body.rating) difference = req.body.rating - review.rating;
 
-        // Recalculate business's average rating
-        if (difference && difference !== 0) {
-          return new Promise((resolve, reject) => {
-            const data = {
-              rid: review._id.toString(),
-              bid: review.businessId.toString(),
-              difference: difference,
-            };
+    //     // Recalculate business's average rating
+    //     if (difference && difference !== 0) {
+    //       return new Promise((resolve, reject) => {
+    //         const data = {
+    //           rid: review._id.toString(),
+    //           bid: review.businessId.toString(),
+    //           difference: difference,
+    //         };
 
-            this._businessGrpcClient.updateReview(data, (err, response) => {
-              if (err) {
-                return reject(err);
-              }
+    //         this._businessGrpcClient.updateReview(data, (err, response) => {
+    //           if (err) {
+    //             return reject(err);
+    //           }
 
-              return resolve(review);
-            });
-          });
-        }
+    //           return resolve(review);
+    //         });
+    //       });
+    //     }
 
-        if (data.files) {
-          //add new images
-        }
+    //     if (data.files) {
+    //       //add new images
+    //     }
 
-        return review;
-      })
-      .then(review => {
-        return review.save();
-      })
-      .then(review => {
-        return res.status(204).send();
-      })
-      .catch(err => {
-        return next(err);
-      });
+    //     return review;
+    //   })
+    //   .then(review => {
+    //     return review.save();
+    //   })
+    //   .then(review => {
+    //     return res.status(204).send();
+    //   })
+    //   .catch(err => {
+    //     return next(err);
+    //   });
   }
 
   /**
@@ -269,6 +328,8 @@ class ReviewController extends BaseController {
           throw new APIError("Forbidden", httpStatus.FORBIDDEN)
         }
 
+        req.review = review;
+
         return new Promise((resolve, reject) => {
           const data = {
             bid: review.businessId.toString(),
@@ -285,13 +346,42 @@ class ReviewController extends BaseController {
           });
         });
       })
-      .then(review => {
-        if (!_.isEmpty(review.imagesUri)) {
+      .then(() => {
+        if (!_.isEmpty(req.review.images)) {
           // Delete related images
+
+          const OSS_Client = new OSS({
+            accessKeyId: config.OSSAccessKey.accessKeyId,
+            accessKeySecret: config.OSSAccessKey.accessKeySecret,
+            region: config.OSSRegion,
+            bucket: config.OSSBucket,
+            secure: true,
+          });
+
+          const imagesUrl = [];
+          
+          req.review.images.map(image => {
+            imagesUrl.push(image.name);
+          });
+
+          return OSS_Client.deleteMulti(imagesUrl);
+        } 
+        else {
+          return {
+            res: {
+              statusCode: 200
+            }
+          };
         }
-        return review.remove();
       })
-      .then(result => {
+      .then(response => {
+        if (response.res.statusCode === 200 || response.res.statusCode === 204) {
+          return req.review.remove();
+        } else {
+          throw new APIError("Aliyun OSS Server Error: " + response.res.message, httpStatus.INTERNAL_SERVER_ERROR);
+        }
+      })
+      .then(() => {
         return res.status(204).send();
       })
       .catch(err => {

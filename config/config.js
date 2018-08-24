@@ -9,6 +9,8 @@ import Joi from 'joi';
 import ms from 'ms';
 require('dotenv').config();
 
+import OSSAccessKey from './secret/OSSAccessKey';
+
 function setConfig() {
 
 	/**
@@ -48,6 +50,9 @@ function setConfig() {
 		ACCESS_JWT_ISSUER: Joi.string().allow(''),
 		ACCESS_JWT_AUDIENCE: Joi.string().allow(''),
 		ACCESS_JWT_EXPIRATION: Joi.string().default(ms('1h')),
+
+		ALIYUN_OSS_REGION: Joi.string(),
+		ALIYUN_OSS_BUCKET: Joi.string(),
 	}).unknown(true);
 
 	const {error, value: envVars} = Joi.validate(process.env, envVarsSchema);
@@ -98,6 +103,11 @@ function setConfig() {
 			//issuer: envVars.ACCESS_JWT_ISSUER,
 			//audience: envVars.ACCESS_JWT_AUDIENCE,
 		},
+
+		OSSAccessKey: OSSAccessKey,
+		OSSRegion: envVars.ALIYUN_OSS_REGION,
+		OSSBucket: envVars.ALIYUN_OSS_BUCKET,
+
 		// sessionSecret: envVars.SESSION_SECRET,
 	};
 

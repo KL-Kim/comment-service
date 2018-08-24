@@ -79,8 +79,13 @@ const ReviewSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User'
   }],
-  "imagesUri": [{
-    type: String
+  "images": [{
+    name: {
+      type: String,
+    },
+    url: {
+      type: String
+    },
   }],
   "createdAt": {
 		type: Date,
@@ -214,7 +219,7 @@ ReviewSchema.statics = {
       })
       .populate({
         path: 'user',
-        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        select: ['username', 'firstName', 'lastName', 'avatarUrl'],
         model: User,
       })
 			.exec();
@@ -287,7 +292,7 @@ ReviewSchema.statics = {
       })
       .populate({
         path: 'user',
-        select: ['username', 'firstName', 'lastName', 'profilePhotoUri'],
+        select: ['username', 'firstName', 'lastName', 'avatarUrl'],
         model: User,
       })
       .exec();

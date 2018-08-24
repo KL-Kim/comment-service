@@ -13,6 +13,7 @@
   "license": "MIT",
   "dependencies": {
     "accesscontrol": "^2.2.1",
+    "ali-oss": "^6.0.1",
     "auto-bind": "^1.2.0",
     "bluebird": "^3.5.1",
     "compression": "^1.7.2",
