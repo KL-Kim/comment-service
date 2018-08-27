@@ -19,7 +19,7 @@ validate.options({
 const storage = multer.diskStorage({
   "destination": 'tmp/images/',
   "filename": (req, file, cb) => {
-    cb(null, file.originalname);
+    cb(null, Date.now() + '.' + file.originalname);
   }
 });
 

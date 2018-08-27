@@ -191,7 +191,7 @@ class ReviewController extends BaseController {
               throw error;
             });
 
-            pathname = 'reviews/' + req.body.uid + '/' + req.review._id.toString() + '/' + image.originalname;
+            pathname = 'reviews/' + req.body.uid + '/' + req.review._id.toString() + '/' + image.filename;
 
             promise = new Promise((resolve, reject) => {
               return OSS_Client.putStream(pathname, readableStream)
